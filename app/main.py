@@ -400,30 +400,6 @@ def equipamentos_index(request: Request):
     )
 
 
-@app.get("/equipamentos/{equipamento_id}", response_class=HTMLResponse)
-def visualizar_equipamento(request: Request, equipamento_id: int):
-    usuario = exigir_login(request)
-    if isinstance(usuario, RedirectResponse):
-        return usuario
-    with get_conn() as conn:
-        equipamento = conn.execute(
-            "SELECT * FROM equipamentos_modelo WHERE id = ?",
-            (equipamento_id,),
-        ).fetchone()
-        if not equipamento:
-            raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
-        atributos = get_atributos_equipamento(conn, equipamento_id, somente_resumo=True)
-    return templates.TemplateResponse(
-        "equipamento_detalhe.html",
-        {
-            "request": request,
-            "equipamento": equipamento,
-            "atributos": atributos,
-            "usuario": usuario,
-        },
-    )
-
-
 @app.get("/usuarios", response_class=HTMLResponse)
 def usuarios_index(request: Request):
     usuario = exigir_admin(request)
@@ -623,6 +599,30 @@ def novo_equipamento(request: Request):
             "equipamento": None,
             "atributos": [],
             "tipos_atributo": TIPOS_ATRIBUTO_EQUIPAMENTO,
+        },
+    )
+
+
+@app.get("/equipamentos/{equipamento_id}", response_class=HTMLResponse)
+def visualizar_equipamento(request: Request, equipamento_id: int):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    with get_conn() as conn:
+        equipamento = conn.execute(
+            "SELECT * FROM equipamentos_modelo WHERE id = ?",
+            (equipamento_id,),
+        ).fetchone()
+        if not equipamento:
+            raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
+        atributos = get_atributos_equipamento(conn, equipamento_id, somente_resumo=True)
+    return templates.TemplateResponse(
+        "equipamento_detalhe.html",
+        {
+            "request": request,
+            "equipamento": equipamento,
+            "atributos": atributos,
+            "usuario": usuario,
         },
     )
 

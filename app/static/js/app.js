@@ -53,6 +53,10 @@
       const ordem = row.querySelector("input[name='attr_ordem']");
       const obrigatorio = row.querySelector("input[name='attr_obrigatorio']");
       const resumo = row.querySelector("input[name='attr_visivel_resumo']");
+      const title = row.querySelector(".atributo-card-header strong");
+      if (title) {
+        title.textContent = `Atributo tecnico #${index + 1}`;
+      }
       if (ordem && !ordem.value) {
         ordem.value = index + 1;
       }

@@ -51,37 +51,47 @@
     <button class="button" type="button" id="add-attribute-button">Adicionar atributo</button>
   </div>
 
-  <div class="attribute-editor" id="attribute-editor">
-    <div class="attribute-row attribute-head">
-      <span>Nome</span>
-      <span>Chave</span>
-      <span>Tipo</span>
-      <span>Valor</span>
-      <span>Unidade</span>
-      <span>Ordem</span>
-      <span>Obrig.</span>
-      <span>Resumo</span>
-      <span></span>
-    </div>
+  <div class="attribute-editor atributos-lista" id="attribute-editor">
     {% for atributo in atributos %}
-    <div class="attribute-row" data-attribute-row>
-      <input name="attr_nome" value="{{ atributo.nome }}" required>
-      <input name="attr_chave" value="{{ atributo.chave }}" required>
-      <select name="attr_tipo">
-        {% for tipo in tipos_atributo %}
-        <option value="{{ tipo }}" {% if atributo.tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
-        {% endfor %}
-      </select>
-      <textarea name="attr_valor" rows="1">{{ atributo.valor or "" }}</textarea>
-      <input name="attr_unidade" value="{{ atributo.unidade or '' }}">
-      <input type="number" name="attr_ordem" value="{{ atributo.ordem or loop.index }}" min="0">
-      <label class="check-cell">
-        <input type="checkbox" name="attr_obrigatorio" value="{{ loop.index0 }}" {% if atributo.obrigatorio %}checked{% endif %}>
-      </label>
-      <label class="check-cell">
-        <input type="checkbox" name="attr_visivel_resumo" value="{{ loop.index0 }}" {% if atributo.visivel_resumo %}checked{% endif %}>
-      </label>
-      <button class="button small danger remove-attribute-button" type="button">Remover</button>
+    <div class="atributo-card" data-attribute-row>
+      <div class="atributo-card-header">
+        <strong>Atributo tecnico #{{ loop.index }}</strong>
+        <button class="button small danger remove-attribute-button" type="button">Remover atributo</button>
+      </div>
+      <div class="atributo-grid">
+        <label>Nome do atributo
+          <input name="attr_nome" value="{{ atributo.nome }}" required>
+        </label>
+        <label>Chave interna
+          <input name="attr_chave" value="{{ atributo.chave }}" required>
+        </label>
+        <label>Tipo
+          <select name="attr_tipo">
+            {% for tipo in tipos_atributo %}
+            <option value="{{ tipo }}" {% if atributo.tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="full">Valor
+          <textarea name="attr_valor" rows="3">{{ atributo.valor or "" }}</textarea>
+        </label>
+        <label>Unidade
+          <input name="attr_unidade" value="{{ atributo.unidade or '' }}">
+        </label>
+        <label>Ordem
+          <input type="number" name="attr_ordem" value="{{ atributo.ordem or loop.index }}" min="0">
+        </label>
+        <div class="checkbox-row full">
+          <label>
+            <input type="checkbox" name="attr_obrigatorio" value="{{ loop.index0 }}" {% if atributo.obrigatorio %}checked{% endif %}>
+            Obrigatorio
+          </label>
+          <label>
+            <input type="checkbox" name="attr_visivel_resumo" value="{{ loop.index0 }}" {% if atributo.visivel_resumo %}checked{% endif %}>
+            Aparece no resumo
+          </label>
+        </div>
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -93,24 +103,45 @@
 </form>
 
 <template id="attribute-row-template">
-  <div class="attribute-row" data-attribute-row>
-    <input name="attr_nome" required>
-    <input name="attr_chave" required>
-    <select name="attr_tipo">
-      {% for tipo in tipos_atributo %}
-      <option value="{{ tipo }}">{{ tipo }}</option>
-      {% endfor %}
-    </select>
-    <textarea name="attr_valor" rows="1"></textarea>
-    <input name="attr_unidade">
-    <input type="number" name="attr_ordem" min="0">
-    <label class="check-cell">
-      <input type="checkbox" name="attr_obrigatorio">
-    </label>
-    <label class="check-cell">
-      <input type="checkbox" name="attr_visivel_resumo" checked>
-    </label>
-    <button class="button small danger remove-attribute-button" type="button">Remover</button>
+  <div class="atributo-card" data-attribute-row>
+    <div class="atributo-card-header">
+      <strong>Atributo tecnico</strong>
+      <button class="button small danger remove-attribute-button" type="button">Remover atributo</button>
+    </div>
+    <div class="atributo-grid">
+      <label>Nome do atributo
+        <input name="attr_nome" required>
+      </label>
+      <label>Chave interna
+        <input name="attr_chave" required>
+      </label>
+      <label>Tipo
+        <select name="attr_tipo">
+          {% for tipo in tipos_atributo %}
+          <option value="{{ tipo }}">{{ tipo }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="full">Valor
+        <textarea name="attr_valor" rows="3"></textarea>
+      </label>
+      <label>Unidade
+        <input name="attr_unidade">
+      </label>
+      <label>Ordem
+        <input type="number" name="attr_ordem" min="0">
+      </label>
+      <div class="checkbox-row full">
+        <label>
+          <input type="checkbox" name="attr_obrigatorio">
+          Obrigatorio
+        </label>
+        <label>
+          <input type="checkbox" name="attr_visivel_resumo" checked>
+          Aparece no resumo
+        </label>
+      </div>
+    </div>
   </div>
 </template>
 {% endblock %}

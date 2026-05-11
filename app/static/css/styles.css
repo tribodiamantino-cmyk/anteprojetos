@@ -481,39 +481,55 @@ legend {
   margin-bottom: 12px;
 }
 
-.attribute-editor {
-  display: grid;
-  gap: 8px;
+.attribute-editor,
+.atributos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   margin-bottom: 18px;
 }
 
-.attribute-row {
+.atributo-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #fbfcfd;
+}
+
+.atributo-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.atributo-grid {
   display: grid;
-  grid-template-columns: minmax(150px, 1.3fr) minmax(130px, 1fr) minmax(105px, 0.8fr) minmax(150px, 1.2fr) minmax(80px, 0.6fr) minmax(72px, 0.5fr) minmax(58px, 0.4fr) minmax(68px, 0.5fr) auto;
-  gap: 8px;
-  align-items: center;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
 }
 
-.attribute-head {
-  color: var(--muted);
-  font-size: 12px;
+.atributo-grid textarea {
+  min-height: 92px;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.checkbox-row label {
+  flex-direction: row;
+  align-items: center;
+  color: #344054;
   font-weight: 700;
-  text-transform: uppercase;
 }
 
-.attribute-row textarea {
-  min-height: 42px;
-  resize: vertical;
-}
-
-.check-cell {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-}
-
-.check-cell input {
+.checkbox-row input {
   width: auto;
 }
 
@@ -737,15 +753,10 @@ legend {
   .form-grid,
   .form-grid.compact,
   .field-row-grid,
-  .attribute-row,
   .dynamic-fields,
   .field-summary,
   .version-meta {
     grid-template-columns: 1fr;
-  }
-
-  .attribute-head {
-    display: none;
   }
 
   .attribute-detail-value {
