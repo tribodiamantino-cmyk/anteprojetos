@@ -6,7 +6,12 @@
     <p>Modelos, variacoes e atributos tecnicos usados nos anteprojetos.</p>
   </div>
   {% if usuario.is_admin %}
-  <a class="button primary" href="/equipamentos/novo">Novo Equipamento</a>
+  <div class="button-row">
+    <a class="button primary" href="/equipamentos/novo">Novo Equipamento</a>
+    <form method="post" action="/equipamentos/zerar" onsubmit="return confirm('Zerar todos os cadastros de equipamentos e atributos? Esta acao nao pode ser desfeita.')">
+      <button class="button danger" type="submit">Zerar equipamentos</button>
+    </form>
+  </div>
   {% endif %}
 </section>
 

@@ -476,6 +476,27 @@ def equipamentos_index(request: Request):
     )
 
 
+@app.post("/equipamentos/zerar")
+def zerar_equipamentos(request: Request):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    with get_conn() as conn:
+        total_usos = conn.execute("SELECT COUNT(*) FROM itens_anteprojeto").fetchone()[0]
+        if total_usos:
+            raise HTTPException(
+                status_code=400,
+                detail="Existem itens de anteprojeto usando equipamentos. Remova esses itens antes de zerar os cadastros.",
+            )
+        conn.execute("DELETE FROM equipamentos_atributos")
+        conn.execute("UPDATE equipamentos_modelo SET parent_id = NULL")
+        conn.execute("DELETE FROM equipamentos_modelo")
+        conn.execute(
+            "DELETE FROM sqlite_sequence WHERE name IN ('equipamentos_atributos', 'equipamentos_modelo')"
+        )
+    return RedirectResponse("/equipamentos", status_code=303)
+
+
 @app.get("/usuarios", response_class=HTMLResponse)
 def usuarios_index(request: Request):
     usuario = exigir_admin(request)
