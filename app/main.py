@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from .auth import autenticar_usuario, exigir_admin, exigir_login
+from .auth import autenticar_usuario, exigir_admin, exigir_login, hash_senha
 from .db import get_conn, init_db, registrar_historico_anteprojeto, touch_anteprojeto
 from .pdf import gerar_pdf_anteprojeto
 
@@ -126,6 +126,16 @@ def unique_name(conn, table, base_name):
         name = f"{base_name} {suffix}"
         suffix += 1
     return name
+
+
+def usuario_form_data(form):
+    return {
+        "nome": (form.get("nome") or "").strip(),
+        "usuario": (form.get("usuario") or "").strip(),
+        "senha": form.get("senha") or "",
+        "is_admin": 1 if form.get("is_admin") == "1" else 0,
+        "ativo": 1 if form.get("ativo") == "1" else 0,
+    }
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -249,6 +259,193 @@ def equipamentos_index(request: Request):
         "equipamentos_index.html",
         {"request": request, "equipamentos": equipamentos},
     )
+
+
+@app.get("/usuarios", response_class=HTMLResponse)
+def usuarios_index(request: Request):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    with get_conn() as conn:
+        usuarios = conn.execute(
+            "SELECT id, nome, usuario, is_admin, ativo, criado_em FROM usuarios ORDER BY ativo DESC, nome"
+        ).fetchall()
+    return templates.TemplateResponse(
+        "usuarios_index.html",
+        {"request": request, "usuarios": usuarios},
+    )
+
+
+@app.get("/usuarios/novo", response_class=HTMLResponse)
+def novo_usuario(request: Request):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    return templates.TemplateResponse(
+        "usuario_form.html",
+        {"request": request, "usuario_editando": None, "erro": None},
+    )
+
+
+@app.post("/usuarios")
+async def criar_usuario(request: Request):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    form = await request.form()
+    dados = usuario_form_data(form)
+
+    if not dados["nome"] or not dados["usuario"] or not dados["senha"]:
+        return templates.TemplateResponse(
+            "usuario_form.html",
+            {
+                "request": request,
+                "usuario_editando": None,
+                "erro": "Nome, usuario e senha sao obrigatorios.",
+            },
+            status_code=400,
+        )
+
+    with get_conn() as conn:
+        existente = conn.execute(
+            "SELECT id FROM usuarios WHERE usuario = ?",
+            (dados["usuario"],),
+        ).fetchone()
+        if existente:
+            return templates.TemplateResponse(
+                "usuario_form.html",
+                {
+                    "request": request,
+                    "usuario_editando": None,
+                    "erro": "Ja existe um usuario com esse login.",
+                },
+                status_code=400,
+            )
+        cur = conn.execute(
+            """
+            INSERT INTO usuarios (nome, usuario, senha_hash, is_admin, ativo)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                dados["nome"],
+                dados["usuario"],
+                hash_senha(dados["senha"]),
+                dados["is_admin"],
+                dados["ativo"],
+            ),
+        )
+    return RedirectResponse(f"/usuarios/{cur.lastrowid}/editar", status_code=303)
+
+
+@app.get("/usuarios/{usuario_id}/editar", response_class=HTMLResponse)
+def editar_usuario(request: Request, usuario_id: int):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    with get_conn() as conn:
+        usuario_editando = conn.execute(
+            "SELECT id, nome, usuario, is_admin, ativo, criado_em FROM usuarios WHERE id = ?",
+            (usuario_id,),
+        ).fetchone()
+        if not usuario_editando:
+            raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+    return templates.TemplateResponse(
+        "usuario_form.html",
+        {"request": request, "usuario_editando": usuario_editando, "erro": None},
+    )
+
+
+@app.post("/usuarios/{usuario_id}")
+async def atualizar_usuario(request: Request, usuario_id: int):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    form = await request.form()
+    dados = usuario_form_data(form)
+
+    if not dados["nome"] or not dados["usuario"]:
+        with get_conn() as conn:
+            usuario_editando = conn.execute(
+                "SELECT id, nome, usuario, is_admin, ativo, criado_em FROM usuarios WHERE id = ?",
+                (usuario_id,),
+            ).fetchone()
+        return templates.TemplateResponse(
+            "usuario_form.html",
+            {
+                "request": request,
+                "usuario_editando": usuario_editando,
+                "erro": "Nome e usuario sao obrigatorios.",
+            },
+            status_code=400,
+        )
+
+    with get_conn() as conn:
+        usuario_editando = conn.execute(
+            "SELECT * FROM usuarios WHERE id = ?",
+            (usuario_id,),
+        ).fetchone()
+        if not usuario_editando:
+            raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+
+        existente = conn.execute(
+            "SELECT id FROM usuarios WHERE usuario = ? AND id <> ?",
+            (dados["usuario"], usuario_id),
+        ).fetchone()
+        if existente:
+            return templates.TemplateResponse(
+                "usuario_form.html",
+                {
+                    "request": request,
+                    "usuario_editando": usuario_editando,
+                    "erro": "Ja existe outro usuario com esse login.",
+                },
+                status_code=400,
+            )
+
+        conn.execute(
+            """
+            UPDATE usuarios
+            SET nome = ?, usuario = ?, is_admin = ?, ativo = ?
+            WHERE id = ?
+            """,
+            (dados["nome"], dados["usuario"], dados["is_admin"], dados["ativo"], usuario_id),
+        )
+        if dados["senha"]:
+            conn.execute(
+                "UPDATE usuarios SET senha_hash = ? WHERE id = ?",
+                (hash_senha(dados["senha"]), usuario_id),
+            )
+
+        if usuario["id"] == usuario_id:
+            request.session["usuario_nome"] = dados["nome"]
+            request.session["usuario"] = dados["usuario"]
+            request.session["is_admin"] = dados["is_admin"]
+            if not dados["ativo"]:
+                request.session.clear()
+                return RedirectResponse("/login", status_code=303)
+
+    return RedirectResponse(f"/usuarios/{usuario_id}/editar", status_code=303)
+
+
+@app.post("/usuarios/{usuario_id}/alternar-status")
+def alternar_status_usuario(request: Request, usuario_id: int):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    with get_conn() as conn:
+        usuario_editando = conn.execute(
+            "SELECT ativo FROM usuarios WHERE id = ?",
+            (usuario_id,),
+        ).fetchone()
+        if not usuario_editando:
+            raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+        novo_status = 0 if usuario_editando["ativo"] else 1
+        conn.execute("UPDATE usuarios SET ativo = ? WHERE id = ?", (novo_status, usuario_id))
+
+    if usuario["id"] == usuario_id and novo_status == 0:
+        request.session.clear()
+        return RedirectResponse("/login", status_code=303)
+    return RedirectResponse("/usuarios", status_code=303)
 
 
 @app.get("/equipamentos/novo", response_class=HTMLResponse)

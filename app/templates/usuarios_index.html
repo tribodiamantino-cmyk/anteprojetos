@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Usuarios</h1>
+    <p>Controle simples de acesso ao sistema.</p>
+  </div>
+  <a class="button primary" href="/usuarios/novo">Novo Usuario</a>
+</section>
+
+{% if usuarios %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Usuario</th>
+        <th>Perfil</th>
+        <th>Ativo</th>
+        <th>Criado em</th>
+        <th>Acoes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for usuario in usuarios %}
+      <tr>
+        <td>{{ usuario.nome }}</td>
+        <td>{{ usuario.usuario }}</td>
+        <td>{% if usuario.is_admin %}<span class="pill">Admin</span>{% else %}<span class="pill muted-pill">Comum</span>{% endif %}</td>
+        <td>{% if usuario.ativo %}<span class="pill">Sim</span>{% else %}<span class="pill muted-pill">Nao</span>{% endif %}</td>
+        <td>{{ usuario.criado_em }}</td>
+        <td>
+          <div class="table-actions">
+            <a class="button small" href="/usuarios/{{ usuario.id }}/editar">Editar</a>
+            <form method="post" action="/usuarios/{{ usuario.id }}/alternar-status">
+              <button class="button small danger" type="submit">{% if usuario.ativo %}Inativar{% else %}Ativar{% endif %}</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <h2>Nenhum usuario cadastrado</h2>
+  <p>Crie um usuario para acessar o sistema.</p>
+</div>
+{% endif %}
+{% endblock %}

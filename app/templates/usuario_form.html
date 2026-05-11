@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>{% if usuario_editando %}Editar usuario{% else %}Novo usuario{% endif %}</h1>
+    <p>Defina acesso comum ou administrativo.</p>
+  </div>
+  <a class="button" href="/usuarios">Voltar</a>
+</section>
+
+{% if erro %}
+<div class="alert danger-alert">{{ erro }}</div>
+{% endif %}
+
+<form class="panel form-grid" method="post" action="{% if usuario_editando %}/usuarios/{{ usuario_editando.id }}{% else %}/usuarios{% endif %}">
+  <label>Nome
+    <input name="nome" value="{{ usuario_editando.nome if usuario_editando else '' }}" required>
+  </label>
+  <label>Usuario
+    <input name="usuario" value="{{ usuario_editando.usuario if usuario_editando else '' }}" required>
+  </label>
+  <label>Senha
+    <input type="password" name="senha" {% if not usuario_editando %}required{% endif %}>
+    {% if usuario_editando %}<span class="hint">Deixe em branco para manter a senha atual.</span>{% endif %}
+  </label>
+  <label>Perfil
+    <select name="is_admin">
+      <option value="0" {% if not usuario_editando or not usuario_editando.is_admin %}selected{% endif %}>Usuario comum</option>
+      <option value="1" {% if usuario_editando and usuario_editando.is_admin %}selected{% endif %}>Admin</option>
+    </select>
+  </label>
+  <label>Ativo
+    <select name="ativo">
+      <option value="1" {% if not usuario_editando or usuario_editando.ativo %}selected{% endif %}>Sim</option>
+      <option value="0" {% if usuario_editando and not usuario_editando.ativo %}selected{% endif %}>Nao</option>
+    </select>
+  </label>
+  <div class="actions full">
+    <button class="button primary" type="submit">Salvar</button>
+    <a class="button" href="/usuarios">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
