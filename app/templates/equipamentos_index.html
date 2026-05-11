@@ -3,77 +3,72 @@
 <section class="page-head">
   <div>
     <h1>Equipamentos</h1>
-    <p>Modelos e atributos tecnicos usados nos anteprojetos.</p>
+    <p>Modelos, variacoes e atributos tecnicos usados nos anteprojetos.</p>
   </div>
   {% if usuario.is_admin %}
   <a class="button primary" href="/equipamentos/novo">Novo Equipamento</a>
   {% endif %}
 </section>
 
+{% macro render_equipamentos(nos, nivel=0) %}
+  {% for equipamento in nos %}
+  <article class="equipment-tree-node" style="--tree-level: {{ nivel }}">
+    <div class="equipment-tree-row">
+      <div class="equipment-tree-main">
+        <a class="table-title-link" href="/equipamentos/{{ equipamento.id }}">{{ equipamento.nome }}</a>
+        {% if equipamento.categoria or equipamento.modelo %}
+        <p class="table-subtitle">{{ equipamento.categoria or "" }}{% if equipamento.categoria and equipamento.modelo %} - {% endif %}{{ equipamento.modelo or "" }}</p>
+        {% endif %}
+        {% if equipamento.atributos_resumo %}
+        <ul class="attribute-summary">
+          {% for atributo in equipamento.atributos_resumo[:4] %}
+          <li>{{ atributo }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+
+      <div class="equipment-tree-status">
+        {% if equipamento.ativo %}
+        <span class="pill">Ativo</span>
+        {% else %}
+        <span class="pill muted-pill">Inativo</span>
+        {% endif %}
+      </div>
+
+      {% if usuario.is_admin %}
+      <div class="table-actions">
+        <a class="button small" href="/equipamentos/{{ equipamento.id }}">Visualizar</a>
+        <a class="button small" href="/equipamentos/{{ equipamento.id }}/editar">Editar</a>
+        <a class="button small" href="/equipamentos/novo?parent_id={{ equipamento.id }}">Adicionar filho</a>
+        <form method="post" action="/equipamentos/{{ equipamento.id }}/duplicar">
+          <button class="button small" type="submit">Duplicar</button>
+        </form>
+        <form method="post" action="/equipamentos/{{ equipamento.id }}/inativar">
+          <button class="button small danger" type="submit">
+            {% if equipamento.ativo %}Inativar{% else %}Ativar{% endif %}
+          </button>
+        </form>
+        <form method="post" action="/equipamentos/{{ equipamento.id }}/excluir" onsubmit="return confirm('Excluir este equipamento? Esta acao so funciona se ele nao tiver filhos e nao estiver em uso.')">
+          <button class="button small danger" type="submit">Remover</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if equipamento.filhos %}
+    <div class="equipment-tree-children">
+      {{ render_equipamentos(equipamento.filhos, nivel + 1) }}
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+{% endmacro %}
+
 {% if equipamentos %}
-<div class="table-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th>Nome</th>
-        <th>Resumo tecnico</th>
-        <th>Ativo</th>
-        {% if usuario.is_admin %}
-        <th>Acoes</th>
-        {% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for equipamento in equipamentos %}
-      <tr>
-        <td>
-          <a class="table-title-link" href="/equipamentos/{{ equipamento.id }}">{{ equipamento.nome }}</a>
-          {% if equipamento.categoria or equipamento.modelo %}
-          <p class="table-subtitle">{{ equipamento.categoria or "" }}{% if equipamento.categoria and equipamento.modelo %} - {% endif %}{{ equipamento.modelo or "" }}</p>
-          {% endif %}
-        </td>
-        <td>
-          {% if equipamento.atributos_resumo %}
-          <ul class="attribute-summary">
-            {% for atributo in equipamento.atributos_resumo[:4] %}
-            <li>{{ atributo }}</li>
-            {% endfor %}
-          </ul>
-          {% else %}
-          <span class="muted">Sem atributos de resumo.</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if equipamento.ativo %}
-          <span class="pill">Sim</span>
-          {% else %}
-          <span class="pill muted-pill">Nao</span>
-          {% endif %}
-        </td>
-        {% if usuario.is_admin %}
-        <td>
-          <div class="table-actions">
-            <a class="button small" href="/equipamentos/{{ equipamento.id }}">Visualizar</a>
-            <a class="button small" href="/equipamentos/{{ equipamento.id }}/editar">Editar</a>
-            <form method="post" action="/equipamentos/{{ equipamento.id }}/duplicar">
-              <button class="button small" type="submit">Duplicar</button>
-            </form>
-            <form method="post" action="/equipamentos/{{ equipamento.id }}/inativar">
-              <button class="button small danger" type="submit">
-                {% if equipamento.ativo %}Inativar{% else %}Ativar{% endif %}
-              </button>
-            </form>
-            <form method="post" action="/equipamentos/{{ equipamento.id }}/excluir" onsubmit="return confirm('Excluir este equipamento? Esta acao so funciona se ele nao estiver em uso.')">
-              <button class="button small danger" type="submit">Excluir</button>
-            </form>
-          </div>
-        </td>
-        {% endif %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+<section class="panel equipment-tree">
+  {{ render_equipamentos(equipamentos_arvore) }}
+</section>
 {% else %}
 <div class="empty">
   <h2>Nenhum equipamento cadastrado</h2>

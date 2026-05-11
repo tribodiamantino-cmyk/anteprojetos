@@ -79,7 +79,12 @@
     <article class="equipment-accordion {% if aberto %}open{% endif %}" data-equipment-id="{{ equipamento.id }}">
       <button class="accordion-trigger" type="button" aria-expanded="{{ 'true' if aberto else 'false' }}">
         <span class="check-dot"></span>
-        <span>{{ equipamento.nome }}</span>
+        <span>
+          {{ equipamento.caminho }}
+          {% if not equipamento.tem_filhos %}
+          <small class="leaf-label">item final</small>
+          {% endif %}
+        </span>
         <span class="accordion-symbol">+</span>
       </button>
 

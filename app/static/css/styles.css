@@ -326,6 +326,50 @@ th {
   line-height: 1.5;
 }
 
+.equipment-tree {
+  display: grid;
+  gap: 10px;
+}
+
+.equipment-tree-node {
+  display: grid;
+  gap: 8px;
+}
+
+.equipment-tree-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(360px, auto);
+  gap: 14px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+  margin-left: calc(var(--tree-level, 0) * 28px);
+}
+
+.equipment-tree-row::before {
+  content: "";
+  display: none;
+}
+
+.equipment-tree-main {
+  min-width: 0;
+}
+
+.equipment-tree-main .attribute-summary {
+  margin-top: 8px;
+}
+
+.equipment-tree-status {
+  padding-top: 2px;
+}
+
+.equipment-tree-children {
+  display: grid;
+  gap: 8px;
+}
+
 .version-form {
   display: flex;
   gap: 10px;
@@ -401,6 +445,14 @@ button.button:disabled {
   color: var(--primary);
   font-size: 18px;
   line-height: 1;
+}
+
+.leaf-label {
+  display: inline-flex;
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .equipment-accordion.open .accordion-symbol {
@@ -733,6 +785,11 @@ legend {
   .section-head,
   .attribute-detail-item {
     flex-direction: column;
+  }
+
+  .equipment-tree-row {
+    grid-template-columns: 1fr;
+    margin-left: calc(var(--tree-level, 0) * 14px);
   }
 
   .topbar {

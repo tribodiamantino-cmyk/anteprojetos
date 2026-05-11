@@ -14,6 +14,7 @@ from .db import (
     get_conn,
     init_db,
     normalize_chave,
+    obter_caminho_equipamento,
     registrar_historico_anteprojeto,
     touch_anteprojeto,
 )
@@ -82,6 +83,71 @@ def formatar_atributo_resumo(atributo):
         valor = "Sim" if str(valor).lower() in ("1", "true", "sim", "yes") else "Nao"
     unidade = atributo["unidade"] or ""
     return f"{atributo['nome']}: {valor}{(' ' + unidade) if unidade else ''}"
+
+
+def montar_arvore_equipamentos(equipamentos):
+    por_id = {}
+    raiz = []
+
+    for equipamento in equipamentos:
+        item = dict(equipamento)
+        item["filhos"] = []
+        por_id[item["id"]] = item
+
+    for item in por_id.values():
+        parent_id = item.get("parent_id")
+        if parent_id and parent_id in por_id:
+            por_id[parent_id]["filhos"].append(item)
+        else:
+            raiz.append(item)
+
+    def ordenar(nos):
+        nos.sort(key=lambda item: ((item.get("nome") or "").lower(), item["id"]))
+        for no in nos:
+            ordenar(no["filhos"])
+
+    ordenar(raiz)
+    return raiz
+
+
+def obter_descendentes_equipamento(conn, equipamento_id):
+    descendentes = set()
+    pendentes = [equipamento_id]
+    while pendentes:
+        atual = pendentes.pop()
+        filhos = conn.execute(
+            "SELECT id FROM equipamentos_modelo WHERE parent_id = ?",
+            (atual,),
+        ).fetchall()
+        for filho in filhos:
+            if filho["id"] not in descendentes:
+                descendentes.add(filho["id"])
+                pendentes.append(filho["id"])
+    return descendentes
+
+
+def get_opcoes_pai_equipamento(conn, equipamento_id=None):
+    bloqueados = {equipamento_id} if equipamento_id else set()
+    if equipamento_id:
+        bloqueados.update(obter_descendentes_equipamento(conn, equipamento_id))
+
+    opcoes = []
+    rows = conn.execute("SELECT id FROM equipamentos_modelo ORDER BY nome").fetchall()
+    for row in rows:
+        if row["id"] in bloqueados:
+            continue
+        opcoes.append({"id": row["id"], "caminho": obter_caminho_equipamento(conn, row["id"])})
+    opcoes.sort(key=lambda item: item["caminho"].lower())
+    return opcoes
+
+
+def has_filhos_equipamento(conn, equipamento_id):
+    return bool(
+        conn.execute(
+            "SELECT 1 FROM equipamentos_modelo WHERE parent_id = ? LIMIT 1",
+            (equipamento_id,),
+        ).fetchone()
+    )
 
 
 def get_anteprojeto_or_404(conn, anteprojeto_id):
@@ -165,7 +231,9 @@ def equipamento_from_form(form):
 
 
 def equipamento_basico_from_form(form):
+    parent_id = form.get("parent_id")
     return {
+        "parent_id": int(parent_id) if parent_id else None,
         "nome": (form.get("nome") or "").strip(),
         "descricao": (form.get("descricao") or "").strip(),
         "categoria": (form.get("categoria") or "").strip(),
@@ -393,10 +461,18 @@ def equipamentos_index(request: Request):
             equipamento = dict(row)
             atributos = get_atributos_equipamento(conn, row["id"], somente_resumo=True)
             equipamento["atributos_resumo"] = [formatar_atributo_resumo(attr) for attr in atributos]
+            equipamento["caminho"] = obter_caminho_equipamento(conn, row["id"])
+            equipamento["tem_filhos"] = has_filhos_equipamento(conn, row["id"])
             equipamentos.append(equipamento)
+        equipamentos_arvore = montar_arvore_equipamentos(equipamentos)
     return templates.TemplateResponse(
         "equipamentos_index.html",
-        {"request": request, "equipamentos": equipamentos, "usuario": usuario},
+        {
+            "request": request,
+            "equipamentos": equipamentos,
+            "equipamentos_arvore": equipamentos_arvore,
+            "usuario": usuario,
+        },
     )
 
 
@@ -588,16 +664,28 @@ def alternar_status_usuario(request: Request, usuario_id: int):
 
 
 @app.get("/equipamentos/novo", response_class=HTMLResponse)
-def novo_equipamento(request: Request):
+def novo_equipamento(request: Request, parent_id: int | None = None):
     usuario = exigir_admin(request)
     if isinstance(usuario, RedirectResponse):
         return usuario
+    with get_conn() as conn:
+        parent_id_selecionado = None
+        if parent_id:
+            parent = conn.execute(
+                "SELECT id FROM equipamentos_modelo WHERE id = ?",
+                (parent_id,),
+            ).fetchone()
+            if parent:
+                parent_id_selecionado = parent_id
+        equipamentos_pai = get_opcoes_pai_equipamento(conn)
     return templates.TemplateResponse(
         "equipamento_form.html",
         {
             "request": request,
             "equipamento": None,
             "atributos": [],
+            "equipamentos_pai": equipamentos_pai,
+            "parent_id_selecionado": parent_id_selecionado,
             "tipos_atributo": TIPOS_ATRIBUTO_EQUIPAMENTO,
         },
     )
@@ -616,12 +704,14 @@ def visualizar_equipamento(request: Request, equipamento_id: int):
         if not equipamento:
             raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
         atributos = get_atributos_equipamento(conn, equipamento_id, somente_resumo=True)
+        caminho = obter_caminho_equipamento(conn, equipamento_id)
     return templates.TemplateResponse(
         "equipamento_detalhe.html",
         {
             "request": request,
             "equipamento": equipamento,
             "atributos": atributos,
+            "caminho": caminho,
             "usuario": usuario,
         },
     )
@@ -643,10 +733,11 @@ async def criar_equipamento(request: Request):
         cur = conn.execute(
             """
             INSERT INTO equipamentos_modelo
-            (nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                dados["parent_id"],
                 dados["nome"],
                 dados["descricao"],
                 dados["categoria"],
@@ -673,12 +764,15 @@ def editar_equipamento(request: Request, equipamento_id: int):
         if not equipamento:
             raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
         atributos = get_atributos_equipamento(conn, equipamento_id)
+        equipamentos_pai = get_opcoes_pai_equipamento(conn, equipamento_id)
     return templates.TemplateResponse(
         "equipamento_form.html",
         {
             "request": request,
             "equipamento": equipamento,
             "atributos": atributos,
+            "equipamentos_pai": equipamentos_pai,
+            "parent_id_selecionado": equipamento["parent_id"],
             "tipos_atributo": TIPOS_ATRIBUTO_EQUIPAMENTO,
         },
     )
@@ -701,14 +795,17 @@ async def atualizar_equipamento(request: Request, equipamento_id: int):
         ).fetchone()
         if not equipamento:
             raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
+        if dados["parent_id"] == equipamento_id or dados["parent_id"] in obter_descendentes_equipamento(conn, equipamento_id):
+            raise HTTPException(status_code=400, detail="Equipamento pai invalido")
         conn.execute(
             """
             UPDATE equipamentos_modelo
-            SET nome = ?, descricao = ?, categoria = ?, subcategoria = ?,
+            SET parent_id = ?, nome = ?, descricao = ?, categoria = ?, subcategoria = ?,
                 fabricante = ?, modelo = ?, ativo = ?, atualizado_em = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
             (
+                dados["parent_id"],
                 dados["nome"],
                 dados["descricao"],
                 dados["categoria"],
@@ -741,10 +838,11 @@ def duplicar_equipamento(request: Request, equipamento_id: int):
         cur = conn.execute(
             """
             INSERT INTO equipamentos_modelo
-            (nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                equipamento["parent_id"],
                 novo_nome,
                 equipamento["descricao"],
                 equipamento["categoria"],
@@ -790,6 +888,11 @@ def excluir_equipamento(request: Request, equipamento_id: int):
         ).fetchone()
         if not equipamento:
             raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
+        if has_filhos_equipamento(conn, equipamento_id):
+            raise HTTPException(
+                status_code=400,
+                detail="Este equipamento possui filhos. Remova ou mova os filhos antes de excluir.",
+            )
 
         total_usos = conn.execute(
             "SELECT COUNT(*) FROM itens_anteprojeto WHERE equipamento_modelo_id = ?",
@@ -867,12 +970,24 @@ def editar_anteprojeto(
         return usuario
     with get_conn() as conn:
         anteprojeto = get_anteprojeto_or_404(conn, anteprojeto_id)
-        equipamentos = [
-            parse_json_row(row)
-            for row in conn.execute(
-                "SELECT * FROM equipamentos_modelo WHERE ativo = 1 ORDER BY nome"
-            ).fetchall()
-        ]
+        equipamentos = []
+        equipamentos_rows = conn.execute(
+            """
+            SELECT e.*,
+                   EXISTS (
+                       SELECT 1 FROM equipamentos_modelo filho
+                       WHERE filho.parent_id = e.id AND filho.ativo = 1
+                   ) AS tem_filhos
+            FROM equipamentos_modelo e
+            WHERE e.ativo = 1
+            ORDER BY tem_filhos, nome
+            """
+        ).fetchall()
+        for row in equipamentos_rows:
+            equipamento = parse_json_row(row)
+            equipamento["caminho"] = obter_caminho_equipamento(conn, row["id"])
+            equipamento["tem_filhos"] = bool(row["tem_filhos"])
+            equipamentos.append(equipamento)
         itens_rows = conn.execute(
             """
             SELECT * FROM itens_anteprojeto
@@ -998,6 +1113,7 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
 
         schema = json.loads(equipamento["schema_json"])
+        caminho_equipamento = obter_caminho_equipamento(conn, equipamento_id)
         quantidade = int(form.get("quantidade") or 1)
         tipo_definicao = form.get("tipo_definicao") or "Engenharia dimensionar"
         situacao = form.get("situacao") or "Novo"
@@ -1025,7 +1141,7 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 """,
                 (
                     equipamento_id,
-                    equipamento["nome"],
+                    caminho_equipamento,
                     quantidade,
                     tipo_definicao,
                     situacao,
@@ -1044,7 +1160,7 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 anteprojeto_id,
                 usuario,
                 "edicao_item",
-                f"Item editado: {equipamento['nome']}",
+                f"Item editado: {caminho_equipamento}",
             )
         else:
             cur = conn.execute(
@@ -1057,7 +1173,7 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 (
                     anteprojeto_id,
                     equipamento_id,
-                    equipamento["nome"],
+                    caminho_equipamento,
                     quantidade,
                     tipo_definicao,
                     situacao,
@@ -1075,7 +1191,7 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 anteprojeto_id,
                 usuario,
                 "inclusao_item",
-                f"Item incluido: {equipamento['nome']}",
+                f"Item incluido: {caminho_equipamento}",
             )
         touch_anteprojeto(conn, anteprojeto_id)
 

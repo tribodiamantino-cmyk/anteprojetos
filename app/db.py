@@ -45,6 +45,7 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS equipamentos_modelo (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                parent_id INTEGER,
                 nome TEXT NOT NULL UNIQUE,
                 descricao TEXT,
                 categoria TEXT,
@@ -54,7 +55,8 @@ def init_db():
                 schema_json TEXT NOT NULL,
                 ativo INTEGER NOT NULL DEFAULT 1,
                 criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (parent_id) REFERENCES equipamentos_modelo(id) ON DELETE RESTRICT
             );
 
             CREATE TABLE IF NOT EXISTS equipamentos_atributos (
@@ -148,6 +150,7 @@ def column_exists(conn, table, column):
 
 def migrate_equipamentos(conn):
     columns = {
+        "parent_id": "INTEGER",
         "descricao": "TEXT",
         "categoria": "TEXT",
         "subcategoria": "TEXT",
@@ -268,6 +271,25 @@ def seed_equipamentos(conn):
             (equipamento["nome"], json.dumps(equipamento, ensure_ascii=False)),
         )
     migrate_schema_json_to_atributos(conn)
+
+
+def obter_caminho_equipamento(conn, equipamento_id):
+    partes = []
+    visitados = set()
+    atual_id = equipamento_id
+
+    while atual_id and atual_id not in visitados:
+        visitados.add(atual_id)
+        row = conn.execute(
+            "SELECT id, parent_id, nome FROM equipamentos_modelo WHERE id = ?",
+            (atual_id,),
+        ).fetchone()
+        if not row:
+            break
+        partes.append(row["nome"])
+        atual_id = row["parent_id"]
+
+    return " > ".join(reversed(partes))
 
 
 def touch_anteprojeto(conn, anteprojeto_id):

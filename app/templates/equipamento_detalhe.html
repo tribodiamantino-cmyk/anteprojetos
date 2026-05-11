@@ -3,7 +3,7 @@
 <section class="page-head">
   <div>
     <h1>{{ equipamento.nome }}</h1>
-    <p>{{ equipamento.categoria or "Equipamento" }}{% if equipamento.subcategoria %} - {{ equipamento.subcategoria }}{% endif %}</p>
+    <p>{{ caminho }}</p>
   </div>
   <div class="button-row">
     <a class="button" href="/equipamentos">Voltar</a>
@@ -20,6 +20,7 @@
     <div><dt>Modelo</dt><dd>{{ equipamento.modelo or "-" }}</dd></div>
     <div><dt>Categoria</dt><dd>{{ equipamento.categoria or "-" }}</dd></div>
     <div><dt>Subcategoria</dt><dd>{{ equipamento.subcategoria or "-" }}</dd></div>
+    <div><dt>Caminho</dt><dd>{{ caminho }}</dd></div>
     <div><dt>Status</dt><dd>{{ "Ativo" if equipamento.ativo else "Inativo" }}</dd></div>
     <div><dt>Descricao</dt><dd>{{ equipamento.descricao or "-" }}</dd></div>
   </dl>

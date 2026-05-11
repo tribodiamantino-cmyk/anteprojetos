@@ -17,6 +17,14 @@
   </div>
 
   <div class="form-grid">
+    <label class="full">Equipamento pai
+      <select name="parent_id">
+        <option value="">Nenhum - equipamento principal</option>
+        {% for opcao in equipamentos_pai %}
+        <option value="{{ opcao.id }}" {% if parent_id_selecionado == opcao.id %}selected{% endif %}>{{ opcao.caminho }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label>Nome do equipamento
       <input name="nome" value="{{ equipamento.nome if equipamento else '' }}" required>
     </label>
