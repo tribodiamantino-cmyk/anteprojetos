@@ -260,6 +260,9 @@ def migrate_schema_json_to_atributos(conn):
 
 
 def seed_equipamentos(conn):
+    if os.getenv("SEED_EQUIPAMENTOS", "0") != "1":
+        return
+
     total = conn.execute("SELECT COUNT(*) FROM equipamentos_modelo").fetchone()[0]
     if total:
         return

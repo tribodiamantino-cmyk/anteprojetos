@@ -2,5 +2,6 @@
 __pycache__/
 *.pyc
 storage.db
+storage.backup-*.db
 /data/*.db
 .env
