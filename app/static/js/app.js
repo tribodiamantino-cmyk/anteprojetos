@@ -107,13 +107,7 @@
 })();
 
 (function () {
-  const equipamentos = window.EQUIPAMENTOS || [];
-  const accordions = document.querySelectorAll(".equipment-accordion");
-  if (!accordions.length) return;
-
   const tipoObraSelect = document.getElementById("tipo-obra");
-  const editCampos = window.ITEM_EDITANDO_CAMPOS || {};
-  const editEquipmentId = window.ITEM_EDITANDO_EQUIPAMENTO_ID;
 
   function currentTipoObra() {
     return tipoObraSelect ? tipoObraSelect.value : window.ANTEPROJETO_TIPO_OBRA;
@@ -139,127 +133,6 @@
     });
   }
 
-  function makeLabel(text) {
-    const label = document.createElement("label");
-    label.textContent = text;
-    return label;
-  }
-
-  function valueFor(equipmentId, campoNome) {
-    if (String(editEquipmentId) !== String(equipmentId)) {
-      return "";
-    }
-    return editCampos[campoNome] || "";
-  }
-
-  function renderCampo(campo, equipmentId) {
-    if (campo.tipo === "info") {
-      const info = document.createElement("div");
-      info.className = "info-box";
-      info.textContent = campo.texto || campo.nome;
-      return info;
-    }
-
-    const label = makeLabel(campo.nome);
-    const name = `campo__${campo.nome}`;
-    const value = valueFor(equipmentId, campo.nome);
-
-    if (campo.tipo === "textarea") {
-      const input = document.createElement("textarea");
-      input.name = name;
-      input.rows = 3;
-      input.value = value;
-      input.required = Boolean(campo.obrigatorio);
-      label.appendChild(input);
-      return label;
-    }
-
-    if (campo.tipo === "select") {
-      const input = document.createElement("select");
-      input.name = name;
-      input.required = Boolean(campo.obrigatorio);
-      const empty = document.createElement("option");
-      empty.value = "";
-      empty.textContent = "Selecione";
-      input.appendChild(empty);
-
-      (campo.opcoes || []).forEach((opcao) => {
-        const option = document.createElement("option");
-        option.value = opcao;
-        option.textContent = opcao;
-        option.selected = value === opcao;
-        input.appendChild(option);
-      });
-
-      label.appendChild(input);
-      return label;
-    }
-
-    if (campo.tipo === "checkbox") {
-      const wrap = document.createElement("fieldset");
-      const legend = document.createElement("legend");
-      legend.textContent = campo.nome;
-      wrap.appendChild(legend);
-      const selected = Array.isArray(value) ? value : [];
-
-      (campo.opcoes || []).forEach((opcao) => {
-        const item = document.createElement("label");
-        item.className = "check-row";
-        const input = document.createElement("input");
-        input.type = "checkbox";
-        input.name = name;
-        input.value = opcao;
-        input.checked = selected.includes(opcao);
-        item.appendChild(input);
-        item.appendChild(document.createTextNode(opcao));
-        wrap.appendChild(item);
-      });
-
-      return wrap;
-    }
-
-    const input = document.createElement("input");
-    input.type = campo.tipo === "number" ? "number" : "text";
-    input.name = name;
-    input.value = value;
-    input.required = Boolean(campo.obrigatorio);
-    label.appendChild(input);
-    return label;
-  }
-
-  function renderFields(accordion) {
-    const equipmentId = accordion.dataset.equipmentId;
-    const target = accordion.querySelector("[data-fields-for]");
-    if (!target || target.dataset.rendered === "true") return;
-
-    const equipamento = equipamentos.find((item) => String(item.id) === String(equipmentId));
-    if (!equipamento) return;
-
-    target.innerHTML = "";
-    (equipamento.campos || []).forEach((campo) => {
-      target.appendChild(renderCampo(campo, equipmentId));
-    });
-    target.dataset.rendered = "true";
-  }
-
-  function setAccordionOpen(accordion, open) {
-    const trigger = accordion.querySelector(".accordion-trigger");
-    accordion.classList.toggle("open", open);
-    trigger.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) {
-      renderFields(accordion);
-    }
-  }
-
-  accordions.forEach((accordion) => {
-    const trigger = accordion.querySelector(".accordion-trigger");
-    trigger.addEventListener("click", () => {
-      const willOpen = !accordion.classList.contains("open");
-      accordions.forEach((item) => setAccordionOpen(item, false));
-      setAccordionOpen(accordion, willOpen);
-    });
-  });
-
   document.querySelectorAll(".situacao-select").forEach(renderSituacao);
 
   if (tipoObraSelect) {
@@ -270,10 +143,166 @@
       });
     });
   }
+})();
 
-  const openAccordion = document.querySelector(".equipment-accordion.open");
-  if (openAccordion) {
-    renderFields(openAccordion);
-    openAccordion.scrollIntoView({ block: "center" });
+(function () {
+  const form = document.getElementById("cascade-equipment-form");
+  if (!form) return;
+
+  const selects = [
+    document.getElementById("equipamento-nivel-0"),
+    document.getElementById("equipamento-nivel-1"),
+    document.getElementById("equipamento-nivel-2"),
+  ];
+  const finalInput = document.getElementById("equipamento-final-id");
+  const pathBox = document.getElementById("equipamento-caminho-selecionado");
+  const attrsBox = document.getElementById("equipamento-atributos-carregados");
+  const selectedChain = window.ITEM_EDITANDO_CADEIA || [];
+
+  function resetSelect(select, placeholder) {
+    select.innerHTML = "";
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = placeholder;
+    select.appendChild(option);
+    select.disabled = true;
   }
+
+  function setOptions(select, items, selectedId) {
+    const placeholder = select.dataset.placeholder || "Selecione";
+    resetSelect(select, placeholder);
+    items.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = item.nome;
+      option.selected = String(selectedId || "") === String(item.id);
+      select.appendChild(option);
+    });
+    select.disabled = items.length === 0;
+  }
+
+  async function fetchJson(url) {
+    const response = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("Falha ao carregar dados");
+    return response.json();
+  }
+
+  function selectedPath() {
+    return selects
+      .filter((select) => select.value)
+      .map((select) => select.options[select.selectedIndex].textContent);
+  }
+
+  function updatePath() {
+    const path = selectedPath();
+    pathBox.textContent = path.length ? path.join(" > ") : "";
+  }
+
+  function renderAttributes(attrs) {
+    attrsBox.innerHTML = "";
+    if (!attrs.length) {
+      attrsBox.innerHTML = '<p class="muted">Nenhum atributo tecnico cadastrado para este item.</p>';
+      return;
+    }
+
+    const title = document.createElement("h3");
+    title.textContent = "Dados carregados";
+    attrsBox.appendChild(title);
+
+    const list = document.createElement("dl");
+    list.className = "loaded-attributes-grid";
+    attrs.forEach((attr) => {
+      const item = document.createElement("div");
+      const dt = document.createElement("dt");
+      const dd = document.createElement("dd");
+      dt.textContent = attr.nome;
+      const value = attr.valor || "-";
+      dd.textContent = attr.unidade ? `${value} ${attr.unidade}` : value;
+      item.appendChild(dt);
+      item.appendChild(dd);
+      list.appendChild(item);
+    });
+    attrsBox.appendChild(list);
+  }
+
+  async function loadAttributes(equipmentId) {
+    if (!equipmentId) {
+      attrsBox.innerHTML = "";
+      return;
+    }
+    const attrs = await fetchJson(`/equipamentos/${equipmentId}/atributos`);
+    renderAttributes(attrs);
+  }
+
+  async function loadChildren(level, parentId, selectedId) {
+    const next = selects[level + 1];
+    if (!next) return [];
+    resetSelect(next, next.dataset.placeholder || "Selecione");
+    for (let index = level + 2; index < selects.length; index += 1) {
+      resetSelect(selects[index], selects[index].dataset.placeholder || "Selecione");
+    }
+    if (!parentId) return [];
+
+    const children = await fetchJson(`/equipamentos/${parentId}/filhos`);
+    setOptions(next, children, selectedId);
+    return children;
+  }
+
+  async function chooseLevel(level) {
+    const selectedId = selects[level].value;
+    finalInput.value = "";
+    attrsBox.innerHTML = "";
+
+    if (!selectedId) {
+      for (let index = level + 1; index < selects.length; index += 1) {
+        resetSelect(selects[index], selects[index].dataset.placeholder || "Selecione");
+      }
+      updatePath();
+      return;
+    }
+
+    const children = await loadChildren(level, selectedId);
+    if (!children.length || level === selects.length - 1) {
+      finalInput.value = selectedId;
+      await loadAttributes(selectedId);
+    }
+    updatePath();
+  }
+
+  selects.forEach((select, level) => {
+    select.addEventListener("change", () => {
+      chooseLevel(level).catch(() => {
+        attrsBox.innerHTML = '<p class="muted">Nao foi possivel carregar os dados do equipamento.</p>';
+      });
+    });
+  });
+
+  form.addEventListener("submit", (event) => {
+    if (!finalInput.value) {
+      event.preventDefault();
+      attrsBox.innerHTML = '<p class="muted">Selecione o modelo final antes de adicionar ao anteprojeto.</p>';
+    }
+  });
+
+  async function preloadSelection() {
+    if (!selectedChain.length) return;
+    selects[0].value = selectedChain[0].id;
+    if (selectedChain[1]) {
+      await loadChildren(0, selectedChain[0].id, selectedChain[1].id);
+    }
+    if (selectedChain[2]) {
+      await loadChildren(1, selectedChain[1].id, selectedChain[2].id);
+      finalInput.value = selectedChain[selectedChain.length - 1].id;
+      await loadAttributes(finalInput.value);
+    } else if (selectedChain[1]) {
+      finalInput.value = selectedChain[1].id;
+      await loadAttributes(finalInput.value);
+    } else {
+      finalInput.value = selectedChain[0].id;
+      await loadAttributes(finalInput.value);
+    }
+    updatePath();
+  }
+
+  preloadSelection().catch(() => {});
 })();

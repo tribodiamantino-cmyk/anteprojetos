@@ -46,7 +46,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS equipamentos_modelo (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 parent_id INTEGER,
-                nome TEXT NOT NULL UNIQUE,
+                nome TEXT NOT NULL,
                 descricao TEXT,
                 categoria TEXT,
                 subcategoria TEXT,
@@ -140,6 +140,7 @@ def init_db():
         )
         migrate_equipamentos(conn)
         seed_equipamentos(conn)
+        seed_silo_fundo_plano_evo50_exemplo(conn)
         seed_admin(conn)
 
 
@@ -149,6 +150,7 @@ def column_exists(conn, table, column):
 
 
 def migrate_equipamentos(conn):
+    migrate_equipamentos_modelo_unique_nome(conn)
     columns = {
         "parent_id": "INTEGER",
         "descricao": "TEXT",
@@ -171,6 +173,54 @@ def migrate_equipamentos(conn):
     )
 
     migrate_schema_json_to_atributos(conn)
+
+
+def migrate_equipamentos_modelo_unique_nome(conn):
+    indexes = conn.execute("PRAGMA index_list(equipamentos_modelo)").fetchall()
+    has_unique_nome = False
+    for index in indexes:
+        if not index["unique"]:
+            continue
+        columns = conn.execute(f"PRAGMA index_info({index['name']})").fetchall()
+        if [column["name"] for column in columns] == ["nome"]:
+            has_unique_nome = True
+            break
+    if not has_unique_nome:
+        return
+
+    conn.execute("PRAGMA foreign_keys = OFF")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS equipamentos_modelo_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_id INTEGER,
+            nome TEXT NOT NULL,
+            descricao TEXT,
+            categoria TEXT,
+            subcategoria TEXT,
+            fabricante TEXT,
+            modelo TEXT,
+            schema_json TEXT NOT NULL,
+            ativo INTEGER NOT NULL DEFAULT 1,
+            criado_em TEXT,
+            atualizado_em TEXT,
+            FOREIGN KEY (parent_id) REFERENCES equipamentos_modelo_new(id) ON DELETE RESTRICT
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO equipamentos_modelo_new
+        (id, parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo,
+         schema_json, ativo, criado_em, atualizado_em)
+        SELECT id, parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo,
+               schema_json, ativo, criado_em, atualizado_em
+        FROM equipamentos_modelo
+        """
+    )
+    conn.execute("DROP TABLE equipamentos_modelo")
+    conn.execute("ALTER TABLE equipamentos_modelo_new RENAME TO equipamentos_modelo")
+    conn.execute("PRAGMA foreign_keys = ON")
 
 
 def normalize_chave(value):
@@ -274,6 +324,90 @@ def seed_equipamentos(conn):
             (equipamento["nome"], json.dumps(equipamento, ensure_ascii=False)),
         )
     migrate_schema_json_to_atributos(conn)
+
+
+def insert_equipamento_seed(
+    conn,
+    nome,
+    parent_id=None,
+    categoria="",
+    subcategoria="",
+    fabricante="",
+    modelo="",
+):
+    cur = conn.execute(
+        """
+        INSERT INTO equipamentos_modelo
+        (parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            parent_id,
+            nome,
+            "",
+            categoria,
+            subcategoria,
+            fabricante,
+            modelo,
+            json.dumps({"nome": nome, "campos": []}, ensure_ascii=False),
+            1,
+        ),
+    )
+    return cur.lastrowid
+
+
+def insert_atributo_seed(conn, equipamento_id, nome, chave, tipo, valor="", unidade="", ordem=0):
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO equipamentos_atributos
+        (equipamento_id, nome, chave, tipo, valor, unidade, ordem, obrigatorio, visivel_resumo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (equipamento_id, nome, chave, tipo, valor, unidade, ordem, 0, 1),
+    )
+
+
+def seed_silo_fundo_plano_evo50_exemplo(conn):
+    existente = conn.execute(
+        "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
+        ("Silo Fundo Plano EVO 50",),
+    ).fetchone()
+    if existente:
+        return
+
+    silo_id = insert_equipamento_seed(
+        conn,
+        "Silo Fundo Plano EVO 50",
+        categoria="Silo",
+        subcategoria="Fundo Plano",
+        fabricante="GSI",
+        modelo="EVO 50",
+    )
+    insert_atributo_seed(conn, silo_id, "Linha", "linha", "texto", "EVO 50", "", 1)
+    insert_atributo_seed(conn, silo_id, "Tipo de silo", "tipo_silo", "texto", "Fundo Plano", "", 2)
+
+    for diametro_ordem, diametro_pes in enumerate((18, 21, 24), start=1):
+        diametro_id = insert_equipamento_seed(conn, f"Diametro {diametro_pes}'", parent_id=silo_id)
+        insert_atributo_seed(
+            conn,
+            diametro_id,
+            "Diametro em pes",
+            "diametro_pes",
+            "numero",
+            str(diametro_pes),
+            "pes",
+            1,
+        )
+        insert_atributo_seed(conn, diametro_id, "Diametro em metros", "diametro_m", "numero", "", "m", 2)
+
+        for aneis in range(6, 13):
+            aneis_id = insert_equipamento_seed(conn, f"{aneis} aneis", parent_id=diametro_id)
+            insert_atributo_seed(conn, aneis_id, "Aneis", "aneis", "inteiro", str(aneis), "", 1)
+            insert_atributo_seed(conn, aneis_id, "Capacidade m3", "capacidade_m3", "numero", "", "m3", 2)
+            insert_atributo_seed(conn, aneis_id, "Capacidade t", "capacidade_t", "numero", "", "t", 3)
+            insert_atributo_seed(conn, aneis_id, "Sacas", "sacas", "numero", "", "sc", 4)
+            insert_atributo_seed(conn, aneis_id, "Altura corpo", "altura_corpo_m", "numero", "", "m", 5)
+            insert_atributo_seed(conn, aneis_id, "Altura total", "altura_total_m", "numero", "", "m", 6)
 
 
 def obter_caminho_equipamento(conn, equipamento_id):

@@ -73,60 +73,62 @@
     {% endif %}
   </div>
 
-  <div class="accordion-list">
-    {% for equipamento in equipamentos %}
-    {% set aberto = item_editando and item_editando.equipamento_modelo_id == equipamento.id %}
-    <article class="equipment-accordion {% if aberto %}open{% endif %}" data-equipment-id="{{ equipamento.id }}">
-      <button class="accordion-trigger" type="button" aria-expanded="{{ 'true' if aberto else 'false' }}">
-        <span class="check-dot"></span>
-        <span>
-          {{ equipamento.caminho }}
-          {% if not equipamento.tem_filhos %}
-          <small class="leaf-label">item final</small>
-          {% endif %}
-        </span>
-        <span class="accordion-symbol">+</span>
+  <form class="item-form cascade-form" method="post" action="/anteprojetos/{{ anteprojeto.id }}/itens" id="cascade-equipment-form">
+    {% if item_editando %}
+    <input type="hidden" name="item_id" value="{{ item_editando.id }}">
+    {% endif %}
+    <input type="hidden" name="equipamento_modelo_id" id="equipamento-final-id" value="{{ item_editando.equipamento_modelo_id if item_editando else '' }}">
+
+    <div class="form-grid compact">
+      <label>Familia / produto pai
+        <select id="equipamento-nivel-0" data-placeholder="Selecione o produto pai">
+          <option value="">Selecione o produto pai</option>
+          {% for produto in produtos_pai %}
+          <option value="{{ produto.id }}" {% if item_editando_cadeia and item_editando_cadeia[0].id == produto.id %}selected{% endif %}>{{ produto.nome }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Variacao nivel 1
+        <select id="equipamento-nivel-1" data-placeholder="Selecione a variacao" disabled>
+          <option value="">Selecione a variacao</option>
+        </select>
+      </label>
+      <label>Variacao nivel 2 / modelo final
+        <select id="equipamento-nivel-2" data-placeholder="Selecione o modelo final" disabled>
+          <option value="">Selecione o modelo final</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="cascade-path" id="equipamento-caminho-selecionado"></div>
+    <div class="loaded-attributes" id="equipamento-atributos-carregados"></div>
+
+    <div class="form-grid compact">
+      <label>Quantidade
+        <input type="number" name="quantidade" min="1" value="{{ item_editando.quantidade if item_editando else 1 }}" required>
+      </label>
+      <label>Tipo de definicao
+        <select name="tipo_definicao">
+          {% for opcao in tipo_definicao_opcoes %}
+          <option value="{{ opcao }}" {% if item_editando and item_editando.tipo_definicao == opcao %}selected{% endif %}>{{ opcao }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Situacao
+        <select name="situacao" class="situacao-select" data-current="{{ item_editando.situacao if item_editando else '' }}"></select>
+      </label>
+    </div>
+
+    <label>Observacao inicial
+      <textarea name="observacao_inicial" rows="3">{{ item_editando.observacao_inicial if item_editando else "" }}</textarea>
+    </label>
+
+    <div class="actions">
+      <button class="button primary" type="submit">
+        {% if item_editando %}Salvar alteracoes{% else %}Adicionar ao anteprojeto{% endif %}
       </button>
-
-      <div class="accordion-body">
-        <form class="item-form" method="post" action="/anteprojetos/{{ anteprojeto.id }}/itens" data-equipment-id="{{ equipamento.id }}">
-          {% if aberto %}
-          <input type="hidden" name="item_id" value="{{ item_editando.id }}">
-          {% endif %}
-          <input type="hidden" name="equipamento_modelo_id" value="{{ equipamento.id }}">
-
-          <div class="form-grid compact">
-            <label>Quantidade
-              <input type="number" name="quantidade" min="1" value="{{ item_editando.quantidade if aberto else 1 }}" required>
-            </label>
-            <label>Tipo de definicao
-              <select name="tipo_definicao">
-                {% for opcao in tipo_definicao_opcoes %}
-                <option value="{{ opcao }}" {% if aberto and item_editando.tipo_definicao == opcao %}selected{% endif %}>{{ opcao }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>Situacao
-              <select name="situacao" class="situacao-select" data-current="{{ item_editando.situacao if aberto else '' }}"></select>
-            </label>
-          </div>
-
-          <div class="dynamic-fields" data-fields-for="{{ equipamento.id }}"></div>
-
-          <label>Observacao inicial
-            <textarea name="observacao_inicial" rows="3">{{ item_editando.observacao_inicial if aberto else "" }}</textarea>
-          </label>
-
-          <div class="actions">
-            <button class="button primary" type="submit">
-              {% if aberto %}Salvar alteracoes{% else %}Adicionar ao anteprojeto{% endif %}
-            </button>
-          </div>
-        </form>
-      </div>
-    </article>
-    {% endfor %}
-  </div>
+    </div>
+  </form>
 </section>
 
 <section class="panel">
@@ -249,9 +251,7 @@
 </section>
 
 <script>
-  window.EQUIPAMENTOS = {{ equipamentos_json | safe }};
   window.ANTEPROJETO_TIPO_OBRA = {{ anteprojeto.tipo_obra | tojson }};
-  window.ITEM_EDITANDO_CAMPOS = {{ item_editando_campos | tojson }};
-  window.ITEM_EDITANDO_EQUIPAMENTO_ID = {{ item_editando.equipamento_modelo_id if item_editando else "null" }};
+  window.ITEM_EDITANDO_CADEIA = {{ item_editando_cadeia | tojson }};
 </script>
 {% endblock %}
