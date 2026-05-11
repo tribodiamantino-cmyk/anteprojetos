@@ -3,9 +3,11 @@
 <section class="page-head">
   <div>
     <h1>Equipamentos</h1>
-    <p>Modelos e campos dinamicos usados nos anteprojetos.</p>
+    <p>Modelos e atributos tecnicos usados nos anteprojetos.</p>
   </div>
+  {% if usuario.is_admin %}
   <a class="button primary" href="/equipamentos/novo">Novo Equipamento</a>
+  {% endif %}
 </section>
 
 {% if equipamentos %}
@@ -14,14 +16,33 @@
     <thead>
       <tr>
         <th>Nome</th>
+        <th>Resumo tecnico</th>
         <th>Ativo</th>
+        {% if usuario.is_admin %}
         <th>Acoes</th>
+        {% endif %}
       </tr>
     </thead>
     <tbody>
       {% for equipamento in equipamentos %}
       <tr>
-        <td>{{ equipamento.nome }}</td>
+        <td>
+          <a class="table-title-link" href="/equipamentos/{{ equipamento.id }}">{{ equipamento.nome }}</a>
+          {% if equipamento.categoria or equipamento.modelo %}
+          <p class="table-subtitle">{{ equipamento.categoria or "" }}{% if equipamento.categoria and equipamento.modelo %} - {% endif %}{{ equipamento.modelo or "" }}</p>
+          {% endif %}
+        </td>
+        <td>
+          {% if equipamento.atributos_resumo %}
+          <ul class="attribute-summary">
+            {% for atributo in equipamento.atributos_resumo[:4] %}
+            <li>{{ atributo }}</li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <span class="muted">Sem atributos de resumo.</span>
+          {% endif %}
+        </td>
         <td>
           {% if equipamento.ativo %}
           <span class="pill">Sim</span>
@@ -29,8 +50,10 @@
           <span class="pill muted-pill">Nao</span>
           {% endif %}
         </td>
+        {% if usuario.is_admin %}
         <td>
           <div class="table-actions">
+            <a class="button small" href="/equipamentos/{{ equipamento.id }}">Visualizar</a>
             <a class="button small" href="/equipamentos/{{ equipamento.id }}/editar">Editar</a>
             <form method="post" action="/equipamentos/{{ equipamento.id }}/duplicar">
               <button class="button small" type="submit">Duplicar</button>
@@ -45,6 +68,7 @@
             </form>
           </div>
         </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>

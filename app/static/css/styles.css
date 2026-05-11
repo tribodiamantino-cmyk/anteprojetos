@@ -304,6 +304,28 @@ th {
   margin: 0;
 }
 
+.table-title-link {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.table-title-link:hover {
+  color: var(--primary-dark);
+}
+
+.table-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.attribute-summary {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .version-form {
   display: flex;
   gap: 10px;
@@ -457,6 +479,74 @@ legend {
   grid-template-columns: minmax(220px, 2fr) minmax(140px, 1fr) minmax(120px, 1fr) minmax(100px, 0.7fr);
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.attribute-editor {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.attribute-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(130px, 1fr) minmax(105px, 0.8fr) minmax(150px, 1.2fr) minmax(80px, 0.6fr) minmax(72px, 0.5fr) minmax(58px, 0.4fr) minmax(68px, 0.5fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.attribute-head {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.attribute-row textarea {
+  min-height: 42px;
+  resize: vertical;
+}
+
+.check-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+.check-cell input {
+  width: auto;
+}
+
+.attribute-detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.attribute-detail-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.attribute-detail-item p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.attribute-detail-value {
+  min-width: 160px;
+  text-align: right;
+  font-weight: 700;
+}
+
+.attribute-detail-value span {
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 4px;
 }
 
 .item-list {
@@ -624,7 +714,8 @@ legend {
   .page-head,
   .item-card,
   .history-item,
-  .section-head {
+  .section-head,
+  .attribute-detail-item {
     flex-direction: column;
   }
 
@@ -646,10 +737,19 @@ legend {
   .form-grid,
   .form-grid.compact,
   .field-row-grid,
+  .attribute-row,
   .dynamic-fields,
   .field-summary,
   .version-meta {
     grid-template-columns: 1fr;
+  }
+
+  .attribute-head {
+    display: none;
+  }
+
+  .attribute-detail-value {
+    text-align: left;
   }
 
   .table-wrap {

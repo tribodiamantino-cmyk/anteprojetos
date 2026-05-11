@@ -46,8 +46,32 @@ def init_db():
             CREATE TABLE IF NOT EXISTS equipamentos_modelo (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nome TEXT NOT NULL UNIQUE,
+                descricao TEXT,
+                categoria TEXT,
+                subcategoria TEXT,
+                fabricante TEXT,
+                modelo TEXT,
                 schema_json TEXT NOT NULL,
-                ativo INTEGER NOT NULL DEFAULT 1
+                ativo INTEGER NOT NULL DEFAULT 1,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS equipamentos_atributos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                equipamento_id INTEGER NOT NULL,
+                nome TEXT NOT NULL,
+                chave TEXT NOT NULL,
+                tipo TEXT NOT NULL CHECK (tipo IN ('texto', 'numero', 'inteiro', 'booleano', 'lista', 'json')),
+                valor TEXT,
+                unidade TEXT,
+                ordem INTEGER DEFAULT 0,
+                obrigatorio INTEGER DEFAULT 0,
+                visivel_resumo INTEGER DEFAULT 1,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (equipamento_id) REFERENCES equipamentos_modelo(id) ON DELETE CASCADE,
+                UNIQUE (equipamento_id, chave)
             );
 
             CREATE TABLE IF NOT EXISTS itens_anteprojeto (
@@ -112,8 +136,124 @@ def init_db():
             );
             """
         )
+        migrate_equipamentos(conn)
         seed_equipamentos(conn)
         seed_admin(conn)
+
+
+def column_exists(conn, table, column):
+    columns = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(row["name"] == column for row in columns)
+
+
+def migrate_equipamentos(conn):
+    columns = {
+        "descricao": "TEXT",
+        "categoria": "TEXT",
+        "subcategoria": "TEXT",
+        "fabricante": "TEXT",
+        "modelo": "TEXT",
+        "criado_em": "TEXT",
+        "atualizado_em": "TEXT",
+    }
+    for column, definition in columns.items():
+        if not column_exists(conn, "equipamentos_modelo", column):
+            conn.execute(f"ALTER TABLE equipamentos_modelo ADD COLUMN {column} {definition}")
+    conn.execute(
+        """
+        UPDATE equipamentos_modelo
+        SET criado_em = COALESCE(criado_em, CURRENT_TIMESTAMP),
+            atualizado_em = COALESCE(atualizado_em, CURRENT_TIMESTAMP)
+        """
+    )
+
+    migrate_schema_json_to_atributos(conn)
+
+
+def normalize_chave(value):
+    normalized = (value or "").strip().lower()
+    replacements = {
+        "á": "a",
+        "à": "a",
+        "ã": "a",
+        "â": "a",
+        "ä": "a",
+        "é": "e",
+        "è": "e",
+        "ê": "e",
+        "ë": "e",
+        "í": "i",
+        "ì": "i",
+        "î": "i",
+        "ï": "i",
+        "ó": "o",
+        "ò": "o",
+        "õ": "o",
+        "ô": "o",
+        "ö": "o",
+        "ú": "u",
+        "ù": "u",
+        "û": "u",
+        "ü": "u",
+        "ç": "c",
+    }
+    for source, target in replacements.items():
+        normalized = normalized.replace(source, target)
+    chars = [char if char.isalnum() else "_" for char in normalized]
+    slug = "_".join(filter(None, "".join(chars).split("_")))
+    return slug or "atributo"
+
+
+def migrate_schema_json_to_atributos(conn):
+    equipamentos = conn.execute("SELECT id, schema_json FROM equipamentos_modelo").fetchall()
+    for equipamento in equipamentos:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM equipamentos_atributos WHERE equipamento_id = ?",
+            (equipamento["id"],),
+        ).fetchone()[0]
+        if total:
+            continue
+
+        try:
+            schema = json.loads(equipamento["schema_json"] or "{}")
+        except json.JSONDecodeError:
+            schema = {}
+
+        campos = schema.get("campos") or []
+        for index, campo in enumerate(campos, start=1):
+            nome = (campo.get("nome") or "").strip()
+            if not nome:
+                continue
+            tipo = {
+                "text": "texto",
+                "textarea": "texto",
+                "number": "numero",
+                "select": "lista",
+                "checkbox": "lista",
+                "info": "texto",
+            }.get(campo.get("tipo"), "texto")
+            valor = ""
+            if campo.get("tipo") in ("select", "checkbox"):
+                valor = "\n".join(campo.get("opcoes") or [])
+            elif campo.get("tipo") == "info":
+                valor = campo.get("texto") or ""
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO equipamentos_atributos
+                (equipamento_id, nome, chave, tipo, valor, ordem, obrigatorio, visivel_resumo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    equipamento["id"],
+                    nome,
+                    normalize_chave(nome),
+                    tipo,
+                    valor,
+                    int(campo.get("ordem") or index),
+                    1 if campo.get("obrigatorio") else 0,
+                    1,
+                ),
+            )
 
 
 def seed_equipamentos(conn):
@@ -127,6 +267,7 @@ def seed_equipamentos(conn):
             "INSERT INTO equipamentos_modelo (nome, schema_json) VALUES (?, ?)",
             (equipamento["nome"], json.dumps(equipamento, ensure_ascii=False)),
         )
+    migrate_schema_json_to_atributos(conn)
 
 
 def touch_anteprojeto(conn, anteprojeto_id):

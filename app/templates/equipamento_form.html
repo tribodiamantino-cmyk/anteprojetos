@@ -3,15 +3,34 @@
 <section class="page-head">
   <div>
     <h1>{% if equipamento %}Editar equipamento{% else %}Novo equipamento{% endif %}</h1>
-    <p>Configure o modelo e os campos que aparecem no anteprojeto.</p>
+    <p>Cadastre os dados tecnicos que identificam este equipamento para o operador.</p>
   </div>
   <a class="button" href="/equipamentos">Voltar</a>
 </section>
 
 <form class="panel" method="post" action="{% if equipamento %}/equipamentos/{{ equipamento.id }}{% else %}/equipamentos{% endif %}">
+  <div class="section-head">
+    <div>
+      <h2>Dados basicos</h2>
+      <p>Informacoes comuns a todos os equipamentos.</p>
+    </div>
+  </div>
+
   <div class="form-grid">
     <label>Nome do equipamento
       <input name="nome" value="{{ equipamento.nome if equipamento else '' }}" required>
+    </label>
+    <label>Categoria
+      <input name="categoria" value="{{ equipamento.categoria if equipamento else '' }}">
+    </label>
+    <label>Subcategoria
+      <input name="subcategoria" value="{{ equipamento.subcategoria if equipamento else '' }}">
+    </label>
+    <label>Fabricante
+      <input name="fabricante" value="{{ equipamento.fabricante if equipamento else '' }}">
+    </label>
+    <label>Modelo
+      <input name="modelo" value="{{ equipamento.modelo if equipamento else '' }}">
     </label>
     <label>Ativo
       <select name="ativo">
@@ -19,47 +38,51 @@
         <option value="0" {% if equipamento and not equipamento.ativo %}selected{% endif %}>Nao</option>
       </select>
     </label>
+    <label class="full">Descricao
+      <textarea name="descricao" rows="3">{{ equipamento.descricao if equipamento else "" }}</textarea>
+    </label>
   </div>
 
   <div class="section-head field-editor-head">
     <div>
-      <h2>Campos dinamicos</h2>
-      <p>Use opcoes em linhas separadas para campos select e checkbox. Em info, esse texto vira a mensagem exibida.</p>
+      <h2>Atributos tecnicos dinamicos</h2>
+      <p>Use uma linha para cada informacao tecnica propria deste equipamento.</p>
     </div>
-    <button class="button" type="button" id="add-field-button">Adicionar campo</button>
+    <button class="button" type="button" id="add-attribute-button">Adicionar atributo</button>
   </div>
 
-  <div class="dynamic-field-editor" id="field-editor">
-    {% for campo in schema.campos %}
-    <article class="field-row">
-      <div class="field-row-grid">
-        <label>Nome do campo
-          <input name="field_nome" value="{{ campo.nome }}" required>
-        </label>
-        <label>Tipo
-          <select name="field_tipo">
-            {% for tipo in tipos_campo %}
-            <option value="{{ tipo }}" {% if campo.tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>Obrigatorio
-          <select name="field_obrigatorio">
-            <option value="nao" {% if not campo.obrigatorio %}selected{% endif %}>Nao</option>
-            <option value="sim" {% if campo.obrigatorio %}selected{% endif %}>Sim</option>
-          </select>
-        </label>
-        <label>Ordem
-          <input type="number" name="field_ordem" value="{{ campo.ordem or loop.index }}" min="1">
-        </label>
-      </div>
-      <label>Opcoes ou texto informativo
-        <textarea name="field_opcoes" rows="3">{% if campo.tipo in ["select", "checkbox"] %}{{ campo.opcoes | join("\n") }}{% elif campo.tipo == "info" %}{{ campo.texto or "" }}{% endif %}</textarea>
+  <div class="attribute-editor" id="attribute-editor">
+    <div class="attribute-row attribute-head">
+      <span>Nome</span>
+      <span>Chave</span>
+      <span>Tipo</span>
+      <span>Valor</span>
+      <span>Unidade</span>
+      <span>Ordem</span>
+      <span>Obrig.</span>
+      <span>Resumo</span>
+      <span></span>
+    </div>
+    {% for atributo in atributos %}
+    <div class="attribute-row" data-attribute-row>
+      <input name="attr_nome" value="{{ atributo.nome }}" required>
+      <input name="attr_chave" value="{{ atributo.chave }}" required>
+      <select name="attr_tipo">
+        {% for tipo in tipos_atributo %}
+        <option value="{{ tipo }}" {% if atributo.tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
+        {% endfor %}
+      </select>
+      <textarea name="attr_valor" rows="1">{{ atributo.valor or "" }}</textarea>
+      <input name="attr_unidade" value="{{ atributo.unidade or '' }}">
+      <input type="number" name="attr_ordem" value="{{ atributo.ordem or loop.index }}" min="0">
+      <label class="check-cell">
+        <input type="checkbox" name="attr_obrigatorio" value="{{ loop.index0 }}" {% if atributo.obrigatorio %}checked{% endif %}>
       </label>
-      <div class="actions">
-        <button class="button small danger remove-field-button" type="button">Remover campo</button>
-      </div>
-    </article>
+      <label class="check-cell">
+        <input type="checkbox" name="attr_visivel_resumo" value="{{ loop.index0 }}" {% if atributo.visivel_resumo %}checked{% endif %}>
+      </label>
+      <button class="button small danger remove-attribute-button" type="button">Remover</button>
+    </div>
     {% endfor %}
   </div>
 
@@ -69,35 +92,25 @@
   </div>
 </form>
 
-<template id="field-row-template">
-  <article class="field-row">
-    <div class="field-row-grid">
-      <label>Nome do campo
-        <input name="field_nome" required>
-      </label>
-      <label>Tipo
-        <select name="field_tipo">
-          {% for tipo in tipos_campo %}
-          <option value="{{ tipo }}">{{ tipo }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Obrigatorio
-        <select name="field_obrigatorio">
-          <option value="nao" selected>Nao</option>
-          <option value="sim">Sim</option>
-        </select>
-      </label>
-      <label>Ordem
-        <input type="number" name="field_ordem" min="1">
-      </label>
-    </div>
-    <label>Opcoes ou texto informativo
-      <textarea name="field_opcoes" rows="3"></textarea>
+<template id="attribute-row-template">
+  <div class="attribute-row" data-attribute-row>
+    <input name="attr_nome" required>
+    <input name="attr_chave" required>
+    <select name="attr_tipo">
+      {% for tipo in tipos_atributo %}
+      <option value="{{ tipo }}">{{ tipo }}</option>
+      {% endfor %}
+    </select>
+    <textarea name="attr_valor" rows="1"></textarea>
+    <input name="attr_unidade">
+    <input type="number" name="attr_ordem" min="0">
+    <label class="check-cell">
+      <input type="checkbox" name="attr_obrigatorio">
     </label>
-    <div class="actions">
-      <button class="button small danger remove-field-button" type="button">Remover campo</button>
-    </div>
-  </article>
+    <label class="check-cell">
+      <input type="checkbox" name="attr_visivel_resumo" checked>
+    </label>
+    <button class="button small danger remove-attribute-button" type="button">Remover</button>
+  </div>
 </template>
 {% endblock %}

@@ -11,8 +11,8 @@
     <a class="brand" href="/">Anteprojetos Agricolas</a>
     <nav class="main-nav">
       <a href="/" class="{% if request.url.path == '/' or request.url.path.startswith('/anteprojetos') %}active{% endif %}">Anteprojetos</a>
-      {% if request.session.get("is_admin") %}
       <a href="/equipamentos" class="{% if request.url.path.startswith('/equipamentos') %}active{% endif %}">Equipamentos</a>
+      {% if request.session.get("is_admin") %}
       <a href="/usuarios" class="{% if request.url.path.startswith('/usuarios') %}active{% endif %}">Usuarios</a>
       {% endif %}
     </nav>

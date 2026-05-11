@@ -29,6 +29,80 @@
 })();
 
 (function () {
+  const attributeEditor = document.getElementById("attribute-editor");
+  const addAttributeButton = document.getElementById("add-attribute-button");
+  const attributeTemplate = document.getElementById("attribute-row-template");
+
+  if (!attributeEditor || !addAttributeButton || !attributeTemplate) return;
+
+  function slug(value) {
+    return (value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "atributo";
+  }
+
+  function rows() {
+    return Array.from(attributeEditor.querySelectorAll("[data-attribute-row]"));
+  }
+
+  function reindex() {
+    rows().forEach((row, index) => {
+      const ordem = row.querySelector("input[name='attr_ordem']");
+      const obrigatorio = row.querySelector("input[name='attr_obrigatorio']");
+      const resumo = row.querySelector("input[name='attr_visivel_resumo']");
+      if (ordem && !ordem.value) {
+        ordem.value = index + 1;
+      }
+      if (obrigatorio) {
+        obrigatorio.value = String(index);
+      }
+      if (resumo) {
+        resumo.value = String(index);
+      }
+    });
+  }
+
+  function bindRow(row) {
+    const nome = row.querySelector("input[name='attr_nome']");
+    const chave = row.querySelector("input[name='attr_chave']");
+    const remove = row.querySelector(".remove-attribute-button");
+
+    if (nome && chave) {
+      nome.addEventListener("input", () => {
+        if (!chave.dataset.edited) {
+          chave.value = slug(nome.value);
+        }
+      });
+      chave.addEventListener("input", () => {
+        chave.dataset.edited = "true";
+        chave.value = slug(chave.value);
+      });
+    }
+
+    if (remove) {
+      remove.addEventListener("click", () => {
+        row.remove();
+        reindex();
+      });
+    }
+  }
+
+  rows().forEach(bindRow);
+  reindex();
+
+  addAttributeButton.addEventListener("click", () => {
+    const fragment = attributeTemplate.content.cloneNode(true);
+    const row = fragment.querySelector("[data-attribute-row]");
+    attributeEditor.appendChild(fragment);
+    bindRow(row);
+    reindex();
+  });
+})();
+
+(function () {
   const equipamentos = window.EQUIPAMENTOS || [];
   const accordions = document.querySelectorAll(".equipment-accordion");
   if (!accordions.length) return;

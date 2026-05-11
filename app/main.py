@@ -13,6 +13,7 @@ from .db import (
     criar_versao_anteprojeto,
     get_conn,
     init_db,
+    normalize_chave,
     registrar_historico_anteprojeto,
     touch_anteprojeto,
 )
@@ -47,6 +48,7 @@ TIPO_OBRA_OPCOES = ["Obra nova", "Reforma"]
 TIPO_DEFINICAO_OPCOES = ["Ja definido", "Parcialmente definido", "Engenharia dimensionar"]
 SITUACAO_REFORMA_OPCOES = ["Novo", "Existente", "Substituir", "Adequar", "Remover"]
 TIPOS_CAMPO_EQUIPAMENTO = ["text", "number", "select", "checkbox", "textarea", "info"]
+TIPOS_ATRIBUTO_EQUIPAMENTO = ["texto", "numero", "inteiro", "booleano", "lista", "json"]
 
 
 @app.on_event("startup")
@@ -58,6 +60,28 @@ def parse_json_row(row, column="schema_json"):
     data = dict(row)
     data["schema"] = json.loads(data[column])
     return data
+
+
+def get_atributos_equipamento(conn, equipamento_id, somente_resumo=False):
+    filtro = "AND visivel_resumo = 1" if somente_resumo else ""
+    return conn.execute(
+        f"""
+        SELECT * FROM equipamentos_atributos
+        WHERE equipamento_id = ? {filtro}
+        ORDER BY ordem, nome, id
+        """,
+        (equipamento_id,),
+    ).fetchall()
+
+
+def formatar_atributo_resumo(atributo):
+    valor = atributo["valor"]
+    if valor in (None, ""):
+        valor = "-"
+    elif atributo["tipo"] == "booleano":
+        valor = "Sim" if str(valor).lower() in ("1", "true", "sim", "yes") else "Nao"
+    unidade = atributo["unidade"] or ""
+    return f"{atributo['nome']}: {valor}{(' ' + unidade) if unidade else ''}"
 
 
 def get_anteprojeto_or_404(conn, anteprojeto_id):
@@ -138,6 +162,93 @@ def equipamento_from_form(form):
         )
 
     return normalize_equipamento_schema(form.get("nome") or "", campos)
+
+
+def equipamento_basico_from_form(form):
+    return {
+        "nome": (form.get("nome") or "").strip(),
+        "descricao": (form.get("descricao") or "").strip(),
+        "categoria": (form.get("categoria") or "").strip(),
+        "subcategoria": (form.get("subcategoria") or "").strip(),
+        "fabricante": (form.get("fabricante") or "").strip(),
+        "modelo": (form.get("modelo") or "").strip(),
+        "ativo": 1 if form.get("ativo") == "1" else 0,
+    }
+
+
+def atributos_from_form(form):
+    nomes = form.getlist("attr_nome")
+    chaves = form.getlist("attr_chave")
+    tipos = form.getlist("attr_tipo")
+    valores = form.getlist("attr_valor")
+    unidades = form.getlist("attr_unidade")
+    ordens = form.getlist("attr_ordem")
+    obrigatorios = set(form.getlist("attr_obrigatorio"))
+    visiveis = set(form.getlist("attr_visivel_resumo"))
+    atributos = []
+    usadas = set()
+
+    for index, nome in enumerate(nomes):
+        nome = (nome or "").strip()
+        if not nome:
+            continue
+
+        chave_base = (chaves[index] if index < len(chaves) else "").strip() or normalize_chave(nome)
+        chave = normalize_chave(chave_base)
+        original = chave
+        suffix = 2
+        while chave in usadas:
+            chave = f"{original}_{suffix}"
+            suffix += 1
+        usadas.add(chave)
+
+        tipo = tipos[index] if index < len(tipos) else "texto"
+        if tipo not in TIPOS_ATRIBUTO_EQUIPAMENTO:
+            tipo = "texto"
+
+        try:
+            ordem = int(ordens[index]) if index < len(ordens) and ordens[index] else index + 1
+        except ValueError:
+            ordem = index + 1
+
+        row_key = str(index)
+        atributos.append(
+            {
+                "nome": nome,
+                "chave": chave,
+                "tipo": tipo,
+                "valor": (valores[index] if index < len(valores) else "").strip(),
+                "unidade": (unidades[index] if index < len(unidades) else "").strip(),
+                "ordem": ordem,
+                "obrigatorio": 1 if row_key in obrigatorios else 0,
+                "visivel_resumo": 1 if row_key in visiveis else 0,
+            }
+        )
+
+    return atributos
+
+
+def salvar_atributos_equipamento(conn, equipamento_id, atributos):
+    conn.execute("DELETE FROM equipamentos_atributos WHERE equipamento_id = ?", (equipamento_id,))
+    for atributo in atributos:
+        conn.execute(
+            """
+            INSERT INTO equipamentos_atributos
+            (equipamento_id, nome, chave, tipo, valor, unidade, ordem, obrigatorio, visivel_resumo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                equipamento_id,
+                atributo["nome"],
+                atributo["chave"],
+                atributo["tipo"],
+                atributo["valor"],
+                atributo["unidade"],
+                atributo["ordem"],
+                atributo["obrigatorio"],
+                atributo["visivel_resumo"],
+            ),
+        )
 
 
 def unique_name(conn, table, base_name):
@@ -270,16 +381,46 @@ def excluir_anteprojeto(request: Request, anteprojeto_id: int):
 
 @app.get("/equipamentos", response_class=HTMLResponse)
 def equipamentos_index(request: Request):
-    usuario = exigir_admin(request)
+    usuario = exigir_login(request)
     if isinstance(usuario, RedirectResponse):
         return usuario
     with get_conn() as conn:
-        equipamentos = conn.execute(
+        equipamentos_rows = conn.execute(
             "SELECT * FROM equipamentos_modelo ORDER BY ativo DESC, nome"
         ).fetchall()
+        equipamentos = []
+        for row in equipamentos_rows:
+            equipamento = dict(row)
+            atributos = get_atributos_equipamento(conn, row["id"], somente_resumo=True)
+            equipamento["atributos_resumo"] = [formatar_atributo_resumo(attr) for attr in atributos]
+            equipamentos.append(equipamento)
     return templates.TemplateResponse(
         "equipamentos_index.html",
-        {"request": request, "equipamentos": equipamentos},
+        {"request": request, "equipamentos": equipamentos, "usuario": usuario},
+    )
+
+
+@app.get("/equipamentos/{equipamento_id}", response_class=HTMLResponse)
+def visualizar_equipamento(request: Request, equipamento_id: int):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    with get_conn() as conn:
+        equipamento = conn.execute(
+            "SELECT * FROM equipamentos_modelo WHERE id = ?",
+            (equipamento_id,),
+        ).fetchone()
+        if not equipamento:
+            raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
+        atributos = get_atributos_equipamento(conn, equipamento_id, somente_resumo=True)
+    return templates.TemplateResponse(
+        "equipamento_detalhe.html",
+        {
+            "request": request,
+            "equipamento": equipamento,
+            "atributos": atributos,
+            "usuario": usuario,
+        },
     )
 
 
@@ -480,8 +621,8 @@ def novo_equipamento(request: Request):
         {
             "request": request,
             "equipamento": None,
-            "schema": {"nome": "", "campos": []},
-            "tipos_campo": TIPOS_CAMPO_EQUIPAMENTO,
+            "atributos": [],
+            "tipos_atributo": TIPOS_ATRIBUTO_EQUIPAMENTO,
         },
     )
 
@@ -492,17 +633,31 @@ async def criar_equipamento(request: Request):
     if isinstance(usuario, RedirectResponse):
         return usuario
     form = await request.form()
-    nome = (form.get("nome") or "").strip()
-    if not nome:
+    dados = equipamento_basico_from_form(form)
+    if not dados["nome"]:
         raise HTTPException(status_code=400, detail="Nome do equipamento e obrigatorio")
 
-    schema = equipamento_from_form(form)
-    ativo = 1 if form.get("ativo") == "1" else 0
+    schema = normalize_equipamento_schema(dados["nome"], [])
+    atributos = atributos_from_form(form)
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO equipamentos_modelo (nome, schema_json, ativo) VALUES (?, ?, ?)",
-            (nome, json.dumps(schema, ensure_ascii=False), ativo),
+            """
+            INSERT INTO equipamentos_modelo
+            (nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dados["nome"],
+                dados["descricao"],
+                dados["categoria"],
+                dados["subcategoria"],
+                dados["fabricante"],
+                dados["modelo"],
+                json.dumps(schema, ensure_ascii=False),
+                dados["ativo"],
+            ),
         )
+        salvar_atributos_equipamento(conn, cur.lastrowid, atributos)
     return RedirectResponse(f"/equipamentos/{cur.lastrowid}/editar", status_code=303)
 
 
@@ -517,14 +672,14 @@ def editar_equipamento(request: Request, equipamento_id: int):
         ).fetchone()
         if not equipamento:
             raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
-    schema = normalize_equipamento_schema(equipamento["nome"], json.loads(equipamento["schema_json"]).get("campos", []))
+        atributos = get_atributos_equipamento(conn, equipamento_id)
     return templates.TemplateResponse(
         "equipamento_form.html",
         {
             "request": request,
             "equipamento": equipamento,
-            "schema": schema,
-            "tipos_campo": TIPOS_CAMPO_EQUIPAMENTO,
+            "atributos": atributos,
+            "tipos_atributo": TIPOS_ATRIBUTO_EQUIPAMENTO,
         },
     )
 
@@ -535,12 +690,11 @@ async def atualizar_equipamento(request: Request, equipamento_id: int):
     if isinstance(usuario, RedirectResponse):
         return usuario
     form = await request.form()
-    nome = (form.get("nome") or "").strip()
-    if not nome:
+    dados = equipamento_basico_from_form(form)
+    if not dados["nome"]:
         raise HTTPException(status_code=400, detail="Nome do equipamento e obrigatorio")
 
-    schema = equipamento_from_form(form)
-    ativo = 1 if form.get("ativo") == "1" else 0
+    atributos = atributos_from_form(form)
     with get_conn() as conn:
         equipamento = conn.execute(
             "SELECT id FROM equipamentos_modelo WHERE id = ?", (equipamento_id,)
@@ -548,9 +702,24 @@ async def atualizar_equipamento(request: Request, equipamento_id: int):
         if not equipamento:
             raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
         conn.execute(
-            "UPDATE equipamentos_modelo SET nome = ?, schema_json = ?, ativo = ? WHERE id = ?",
-            (nome, json.dumps(schema, ensure_ascii=False), ativo, equipamento_id),
+            """
+            UPDATE equipamentos_modelo
+            SET nome = ?, descricao = ?, categoria = ?, subcategoria = ?,
+                fabricante = ?, modelo = ?, ativo = ?, atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                dados["nome"],
+                dados["descricao"],
+                dados["categoria"],
+                dados["subcategoria"],
+                dados["fabricante"],
+                dados["modelo"],
+                dados["ativo"],
+                equipamento_id,
+            ),
         )
+        salvar_atributos_equipamento(conn, equipamento_id, atributos)
     return RedirectResponse(f"/equipamentos/{equipamento_id}/editar", status_code=303)
 
 
@@ -570,9 +739,24 @@ def duplicar_equipamento(request: Request, equipamento_id: int):
         novo_nome = unique_name(conn, "equipamentos_modelo", f"{equipamento['nome']} - Copia")
         schema["nome"] = novo_nome
         cur = conn.execute(
-            "INSERT INTO equipamentos_modelo (nome, schema_json, ativo) VALUES (?, ?, ?)",
-            (novo_nome, json.dumps(schema, ensure_ascii=False), equipamento["ativo"]),
+            """
+            INSERT INTO equipamentos_modelo
+            (nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                novo_nome,
+                equipamento["descricao"],
+                equipamento["categoria"],
+                equipamento["subcategoria"],
+                equipamento["fabricante"],
+                equipamento["modelo"],
+                json.dumps(schema, ensure_ascii=False),
+                equipamento["ativo"],
+            ),
         )
+        atributos = get_atributos_equipamento(conn, equipamento_id)
+        salvar_atributos_equipamento(conn, cur.lastrowid, [dict(attr) for attr in atributos])
     return RedirectResponse(f"/equipamentos/{cur.lastrowid}/editar", status_code=303)
 
 
