@@ -1,16 +1,23 @@
 import json
+import os
 from typing import Annotated
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
-from .db import get_conn, init_db, touch_anteprojeto
+from .auth import autenticar_usuario, exigir_admin, exigir_login
+from .db import get_conn, init_db, registrar_historico_anteprojeto, touch_anteprojeto
 from .pdf import gerar_pdf_anteprojeto
 
 
 app = FastAPI(title="Anteprojetos de Armazenagem Agricola")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", "dev-secret-change-me"),
+)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
@@ -121,8 +128,39 @@ def unique_name(conn, table, base_name):
     return name
 
 
+@app.get("/login", response_class=HTMLResponse)
+def login_form(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request, "erro": None})
+
+
+@app.post("/login")
+def login(request: Request, usuario: Annotated[str, Form()], senha: Annotated[str, Form()]):
+    usuario_row = autenticar_usuario(usuario.strip(), senha)
+    if not usuario_row:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "erro": "Usuario ou senha invalidos."},
+            status_code=401,
+        )
+
+    request.session["usuario_id"] = usuario_row["id"]
+    request.session["usuario_nome"] = usuario_row["nome"]
+    request.session["usuario"] = usuario_row["usuario"]
+    request.session["is_admin"] = usuario_row["is_admin"]
+    return RedirectResponse("/", status_code=303)
+
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/login", status_code=303)
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         anteprojetos = conn.execute(
             "SELECT * FROM anteprojetos ORDER BY updated_at DESC, id DESC"
@@ -131,7 +169,10 @@ def index(request: Request):
 
 
 @app.post("/anteprojetos/{anteprojeto_id}/duplicar")
-def duplicar_anteprojeto(anteprojeto_id: int):
+def duplicar_anteprojeto(request: Request, anteprojeto_id: int):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         anteprojeto = get_anteprojeto_or_404(conn, anteprojeto_id)
         cur = conn.execute(
@@ -174,11 +215,21 @@ def duplicar_anteprojeto(anteprojeto_id: int):
                     item["retorno_engenharia"],
                 ),
             )
+        registrar_historico_anteprojeto(
+            conn,
+            novo_id,
+            usuario,
+            "criacao",
+            f"Anteprojeto duplicado a partir do #{anteprojeto_id}",
+        )
     return RedirectResponse(f"/anteprojetos/{novo_id}", status_code=303)
 
 
 @app.post("/anteprojetos/{anteprojeto_id}/excluir")
-def excluir_anteprojeto(anteprojeto_id: int):
+def excluir_anteprojeto(request: Request, anteprojeto_id: int):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         get_anteprojeto_or_404(conn, anteprojeto_id)
         conn.execute("DELETE FROM anteprojetos WHERE id = ?", (anteprojeto_id,))
@@ -187,6 +238,9 @@ def excluir_anteprojeto(anteprojeto_id: int):
 
 @app.get("/equipamentos", response_class=HTMLResponse)
 def equipamentos_index(request: Request):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         equipamentos = conn.execute(
             "SELECT * FROM equipamentos_modelo ORDER BY ativo DESC, nome"
@@ -199,6 +253,9 @@ def equipamentos_index(request: Request):
 
 @app.get("/equipamentos/novo", response_class=HTMLResponse)
 def novo_equipamento(request: Request):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     return templates.TemplateResponse(
         "equipamento_form.html",
         {
@@ -212,6 +269,9 @@ def novo_equipamento(request: Request):
 
 @app.post("/equipamentos")
 async def criar_equipamento(request: Request):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     form = await request.form()
     nome = (form.get("nome") or "").strip()
     if not nome:
@@ -229,6 +289,9 @@ async def criar_equipamento(request: Request):
 
 @app.get("/equipamentos/{equipamento_id}/editar", response_class=HTMLResponse)
 def editar_equipamento(request: Request, equipamento_id: int):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         equipamento = conn.execute(
             "SELECT * FROM equipamentos_modelo WHERE id = ?", (equipamento_id,)
@@ -249,6 +312,9 @@ def editar_equipamento(request: Request, equipamento_id: int):
 
 @app.post("/equipamentos/{equipamento_id}")
 async def atualizar_equipamento(request: Request, equipamento_id: int):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     form = await request.form()
     nome = (form.get("nome") or "").strip()
     if not nome:
@@ -270,7 +336,10 @@ async def atualizar_equipamento(request: Request, equipamento_id: int):
 
 
 @app.post("/equipamentos/{equipamento_id}/duplicar")
-def duplicar_equipamento(equipamento_id: int):
+def duplicar_equipamento(request: Request, equipamento_id: int):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         equipamento = conn.execute(
             "SELECT * FROM equipamentos_modelo WHERE id = ?", (equipamento_id,)
@@ -289,7 +358,10 @@ def duplicar_equipamento(equipamento_id: int):
 
 
 @app.post("/equipamentos/{equipamento_id}/inativar")
-def inativar_equipamento(equipamento_id: int):
+def inativar_equipamento(request: Request, equipamento_id: int):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         equipamento = conn.execute(
             "SELECT ativo FROM equipamentos_modelo WHERE id = ?", (equipamento_id,)
@@ -305,7 +377,10 @@ def inativar_equipamento(equipamento_id: int):
 
 
 @app.post("/equipamentos/{equipamento_id}/excluir")
-def excluir_equipamento(equipamento_id: int):
+def excluir_equipamento(request: Request, equipamento_id: int):
+    usuario = exigir_admin(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         equipamento = conn.execute(
             "SELECT id FROM equipamentos_modelo WHERE id = ?", (equipamento_id,)
@@ -329,6 +404,9 @@ def excluir_equipamento(equipamento_id: int):
 
 @app.get("/anteprojetos/novo", response_class=HTMLResponse)
 def novo_anteprojeto(request: Request):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     return templates.TemplateResponse(
         "anteprojeto_form.html",
         {
@@ -342,6 +420,7 @@ def novo_anteprojeto(request: Request):
 
 @app.post("/anteprojetos")
 def criar_anteprojeto(
+    request: Request,
     cliente: Annotated[str, Form()],
     obra_local: Annotated[str, Form()],
     tipo_obra: Annotated[str, Form()],
@@ -349,6 +428,9 @@ def criar_anteprojeto(
     observacoes_gerais: Annotated[str, Form()] = "",
     status: Annotated[str, Form()] = "Rascunho",
 ):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         cur = conn.execute(
             """
@@ -359,6 +441,13 @@ def criar_anteprojeto(
             (cliente, obra_local, tipo_obra, responsavel, observacoes_gerais, status),
         )
         anteprojeto_id = cur.lastrowid
+        registrar_historico_anteprojeto(
+            conn,
+            anteprojeto_id,
+            usuario,
+            "criacao",
+            "Anteprojeto criado",
+        )
     return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
 
 
@@ -369,6 +458,9 @@ def editar_anteprojeto(
     item_id: int | None = None,
     retorno_item_id: int | None = None,
 ):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         anteprojeto = get_anteprojeto_or_404(conn, anteprojeto_id)
         equipamentos = [
@@ -402,6 +494,14 @@ def editar_anteprojeto(
                 "SELECT * FROM itens_anteprojeto WHERE id = ? AND anteprojeto_id = ?",
                 (retorno_item_id, anteprojeto_id),
             ).fetchone()
+        historico = conn.execute(
+            """
+            SELECT * FROM historico_anteprojeto
+            WHERE anteprojeto_id = ?
+            ORDER BY criado_em DESC, id DESC
+            """,
+            (anteprojeto_id,),
+        ).fetchall()
 
     return templates.TemplateResponse(
         "anteprojeto_edit.html",
@@ -415,6 +515,7 @@ def editar_anteprojeto(
             "item_editando": item_editando,
             "item_editando_campos": json.loads(item_editando["campos_json"]) if item_editando else {},
             "retorno_item": retorno_item,
+            "historico": historico,
             "status_opcoes": STATUS_OPCOES,
             "tipo_obra_opcoes": TIPO_OBRA_OPCOES,
             "tipo_definicao_opcoes": TIPO_DEFINICAO_OPCOES,
@@ -425,6 +526,7 @@ def editar_anteprojeto(
 
 @app.post("/anteprojetos/{anteprojeto_id}")
 def atualizar_anteprojeto(
+    request: Request,
     anteprojeto_id: int,
     cliente: Annotated[str, Form()],
     obra_local: Annotated[str, Form()],
@@ -433,8 +535,11 @@ def atualizar_anteprojeto(
     observacoes_gerais: Annotated[str, Form()] = "",
     status: Annotated[str, Form()] = "Rascunho",
 ):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
-        get_anteprojeto_or_404(conn, anteprojeto_id)
+        anteprojeto_atual = get_anteprojeto_or_404(conn, anteprojeto_id)
         conn.execute(
             """
             UPDATE anteprojetos
@@ -444,11 +549,24 @@ def atualizar_anteprojeto(
             """,
             (cliente, obra_local, tipo_obra, responsavel, observacoes_gerais, status, anteprojeto_id),
         )
+        descricao = "Dados gerais atualizados"
+        if anteprojeto_atual["status"] != status:
+            descricao = f"Status alterado de {anteprojeto_atual['status']} para {status}"
+        registrar_historico_anteprojeto(
+            conn,
+            anteprojeto_id,
+            usuario,
+            "edicao",
+            descricao,
+        )
     return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
 
 
 @app.post("/anteprojetos/{anteprojeto_id}/itens")
 async def salvar_item(request: Request, anteprojeto_id: int):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     form = await request.form()
     item_id = form.get("item_id")
     equipamento_id = int(form["equipamento_modelo_id"])
@@ -503,6 +621,13 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 "INSERT INTO historico_item (item_id, descricao) VALUES (?, ?)",
                 (item_id, "Item editado"),
             )
+            registrar_historico_anteprojeto(
+                conn,
+                anteprojeto_id,
+                usuario,
+                "edicao_item",
+                f"Item editado: {equipamento['nome']}",
+            )
         else:
             cur = conn.execute(
                 """
@@ -527,6 +652,13 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 "INSERT INTO historico_item (item_id, descricao) VALUES (?, ?)",
                 (cur.lastrowid, "Item adicionado"),
             )
+            registrar_historico_anteprojeto(
+                conn,
+                anteprojeto_id,
+                usuario,
+                "inclusao_item",
+                f"Item incluido: {equipamento['nome']}",
+            )
         touch_anteprojeto(conn, anteprojeto_id)
 
     return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
@@ -534,10 +666,14 @@ async def salvar_item(request: Request, anteprojeto_id: int):
 
 @app.post("/anteprojetos/{anteprojeto_id}/itens/{item_id}/retorno")
 def salvar_retorno_engenharia(
+    request: Request,
     anteprojeto_id: int,
     item_id: int,
     retorno_engenharia: Annotated[str, Form()] = "",
 ):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         get_anteprojeto_or_404(conn, anteprojeto_id)
         item = conn.execute(
@@ -558,25 +694,49 @@ def salvar_retorno_engenharia(
             "INSERT INTO historico_item (item_id, descricao) VALUES (?, ?)",
             (item_id, "Retorno da engenharia atualizado"),
         )
+        registrar_historico_anteprojeto(
+            conn,
+            anteprojeto_id,
+            usuario,
+            "retorno_engenharia",
+            "Retorno da engenharia alterado",
+        )
         touch_anteprojeto(conn, anteprojeto_id)
 
     return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
 
 
 @app.post("/anteprojetos/{anteprojeto_id}/itens/{item_id}/remover")
-def remover_item(anteprojeto_id: int, item_id: int):
+def remover_item(request: Request, anteprojeto_id: int, item_id: int):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         get_anteprojeto_or_404(conn, anteprojeto_id)
+        item = conn.execute(
+            "SELECT equipamento_nome FROM itens_anteprojeto WHERE id = ? AND anteprojeto_id = ?",
+            (item_id, anteprojeto_id),
+        ).fetchone()
         conn.execute(
             "DELETE FROM itens_anteprojeto WHERE id = ? AND anteprojeto_id = ?",
             (item_id, anteprojeto_id),
+        )
+        registrar_historico_anteprojeto(
+            conn,
+            anteprojeto_id,
+            usuario,
+            "exclusao_item",
+            f"Item removido: {item['equipamento_nome'] if item else item_id}",
         )
         touch_anteprojeto(conn, anteprojeto_id)
     return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
 
 
 @app.get("/anteprojetos/{anteprojeto_id}/pdf")
-def pdf_anteprojeto(anteprojeto_id: int):
+def pdf_anteprojeto(request: Request, anteprojeto_id: int):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
     with get_conn() as conn:
         anteprojeto = get_anteprojeto_or_404(conn, anteprojeto_id)
         itens = conn.execute(

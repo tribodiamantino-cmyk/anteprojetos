@@ -100,6 +100,7 @@ Configure a variavel de ambiente:
 
 ```text
 DATABASE_PATH=/data/storage.db
+SESSION_SECRET=uma-chave-grande-aleatoria
 ```
 
 Com isso, o SQLite fica salvo no volume persistente e nao e perdido entre deploys.

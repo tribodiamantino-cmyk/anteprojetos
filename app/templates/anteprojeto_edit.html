@@ -176,6 +176,28 @@
   {% endif %}
 </section>
 
+<section class="panel">
+  <h2>Historico de alteracoes</h2>
+  {% if historico %}
+  <div class="history-list">
+    {% for evento in historico %}
+    <article class="history-item">
+      <div>
+        <strong>{{ evento.acao }}</strong>
+        <p>{{ evento.descricao or "" }}</p>
+      </div>
+      <div class="history-meta">
+        <span>{{ evento.criado_em }}</span>
+        <span>{{ evento.usuario_nome or "Sistema" }}</span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">Nenhuma alteracao registrada ainda.</p>
+  {% endif %}
+</section>
+
 <script>
   window.EQUIPAMENTOS = {{ equipamentos_json | safe }};
   window.ANTEPROJETO_TIPO_OBRA = {{ anteprojeto.tipo_obra | tojson }};

@@ -3,9 +3,12 @@ import os
 import sqlite3
 from pathlib import Path
 
+from passlib.context import CryptContext
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SEED_PATH = Path(__file__).resolve().parent / "data" / "equipamentos_seed.json"
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def get_db_path():
@@ -71,9 +74,32 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (item_id) REFERENCES itens_anteprojeto(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL,
+                usuario TEXT UNIQUE NOT NULL,
+                senha_hash TEXT NOT NULL,
+                is_admin INTEGER NOT NULL DEFAULT 0,
+                ativo INTEGER NOT NULL DEFAULT 1,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS historico_anteprojeto (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                anteprojeto_id INTEGER NOT NULL,
+                usuario_id INTEGER,
+                usuario_nome TEXT,
+                acao TEXT NOT NULL,
+                descricao TEXT,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (anteprojeto_id) REFERENCES anteprojetos(id) ON DELETE CASCADE,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            );
             """
         )
         seed_equipamentos(conn)
+        seed_admin(conn)
 
 
 def seed_equipamentos(conn):
@@ -93,4 +119,34 @@ def touch_anteprojeto(conn, anteprojeto_id):
     conn.execute(
         "UPDATE anteprojetos SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (anteprojeto_id,),
+    )
+
+
+def seed_admin(conn):
+    total = conn.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
+    if total:
+        return
+    conn.execute(
+        """
+        INSERT INTO usuarios (nome, usuario, senha_hash, is_admin, ativo)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        ("Administrador", "admin", pwd_context.hash("admin123"), 1, 1),
+    )
+
+
+def registrar_historico_anteprojeto(conn, anteprojeto_id, usuario, acao, descricao=None):
+    conn.execute(
+        """
+        INSERT INTO historico_anteprojeto
+        (anteprojeto_id, usuario_id, usuario_nome, acao, descricao)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            anteprojeto_id,
+            usuario.get("id") if usuario else None,
+            usuario.get("nome") if usuario else None,
+            acao,
+            descricao,
+        ),
     )
