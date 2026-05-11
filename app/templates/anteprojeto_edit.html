@@ -198,6 +198,51 @@
   {% endif %}
 </section>
 
+<section class="panel" id="versoes">
+  <div class="section-head">
+    <div>
+      <h2>Versoes</h2>
+      <p>Fotografias registradas nos marcos importantes do anteprojeto.</p>
+    </div>
+    <form class="version-form" method="post" action="/anteprojetos/{{ anteprojeto.id }}/versoes">
+      <input name="motivo" value="Versao manual" aria-label="Motivo da versao">
+      <button class="button primary" type="submit">Criar nova versao</button>
+    </form>
+  </div>
+
+  {% if versoes %}
+  <div class="version-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Versao</th>
+          <th>Data/hora</th>
+          <th>Usuario</th>
+          <th>Motivo</th>
+          <th>Acoes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for versao in versoes %}
+        <tr>
+          <td><strong>{{ versao.numero_versao }}</strong></td>
+          <td>{{ versao.criado_em }}</td>
+          <td>{{ versao.usuario_nome or "Sistema" }}</td>
+          <td>{{ versao.motivo }}</td>
+          <td>
+            <a class="button small" href="/anteprojetos/{{ anteprojeto.id }}/versoes/{{ versao.id }}">Visualizar</a>
+            <button class="button small" type="button" disabled>Gerar PDF desta versao</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Nenhuma versao registrada ainda.</p>
+  {% endif %}
+</section>
+
 <script>
   window.EQUIPAMENTOS = {{ equipamentos_json | safe }};
   window.ANTEPROJETO_TIPO_OBRA = {{ anteprojeto.tipo_obra | tojson }};

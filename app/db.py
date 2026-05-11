@@ -96,6 +96,20 @@ def init_db():
                 FOREIGN KEY (anteprojeto_id) REFERENCES anteprojetos(id) ON DELETE CASCADE,
                 FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
             );
+
+            CREATE TABLE IF NOT EXISTS versoes_anteprojeto (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                anteprojeto_id INTEGER NOT NULL,
+                numero_versao INTEGER NOT NULL,
+                usuario_id INTEGER,
+                usuario_nome TEXT,
+                motivo TEXT NOT NULL,
+                snapshot_json TEXT NOT NULL,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (anteprojeto_id) REFERENCES anteprojetos(id) ON DELETE CASCADE,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+                UNIQUE (anteprojeto_id, numero_versao)
+            );
             """
         )
         seed_equipamentos(conn)
@@ -150,3 +164,85 @@ def registrar_historico_anteprojeto(conn, anteprojeto_id, usuario, acao, descric
             descricao,
         ),
     )
+
+
+def row_to_dict(row):
+    return dict(row) if row else None
+
+
+def gerar_snapshot_anteprojeto(conn, anteprojeto_id):
+    anteprojeto = conn.execute(
+        "SELECT * FROM anteprojetos WHERE id = ?",
+        (anteprojeto_id,),
+    ).fetchone()
+    if not anteprojeto:
+        return None
+
+    itens = []
+    equipamento_ids = set()
+    itens_rows = conn.execute(
+        """
+        SELECT * FROM itens_anteprojeto
+        WHERE anteprojeto_id = ?
+        ORDER BY tipo_definicao, equipamento_nome, id
+        """,
+        (anteprojeto_id,),
+    ).fetchall()
+    for row in itens_rows:
+        item = row_to_dict(row)
+        item["campos"] = json.loads(item.pop("campos_json") or "{}")
+        equipamento_ids.add(item["equipamento_modelo_id"])
+        itens.append(item)
+
+    equipamentos = []
+    if equipamento_ids:
+        placeholders = ",".join("?" for _ in equipamento_ids)
+        equipamentos_rows = conn.execute(
+            f"""
+            SELECT * FROM equipamentos_modelo
+            WHERE id IN ({placeholders})
+            ORDER BY nome
+            """,
+            tuple(equipamento_ids),
+        ).fetchall()
+        for row in equipamentos_rows:
+            equipamento = row_to_dict(row)
+            equipamento["schema"] = json.loads(equipamento.pop("schema_json") or "{}")
+            equipamentos.append(equipamento)
+
+    return {
+        "anteprojeto": row_to_dict(anteprojeto),
+        "itens": itens,
+        "equipamentos": equipamentos,
+    }
+
+
+def criar_versao_anteprojeto(conn, anteprojeto_id, usuario, motivo):
+    snapshot = gerar_snapshot_anteprojeto(conn, anteprojeto_id)
+    if not snapshot:
+        return None
+
+    numero_versao = conn.execute(
+        """
+        SELECT COALESCE(MAX(numero_versao), 0) + 1
+        FROM versoes_anteprojeto
+        WHERE anteprojeto_id = ?
+        """,
+        (anteprojeto_id,),
+    ).fetchone()[0]
+    cur = conn.execute(
+        """
+        INSERT INTO versoes_anteprojeto
+        (anteprojeto_id, numero_versao, usuario_id, usuario_nome, motivo, snapshot_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            anteprojeto_id,
+            numero_versao,
+            usuario.get("id") if usuario else None,
+            usuario.get("nome") if usuario else None,
+            motivo,
+            json.dumps(snapshot, ensure_ascii=False, indent=2),
+        ),
+    )
+    return cur.lastrowid

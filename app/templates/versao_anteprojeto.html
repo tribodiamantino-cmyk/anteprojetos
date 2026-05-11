@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Versao {{ versao.numero_versao }}</h1>
+    <p>{{ anteprojeto.cliente }} - {{ versao.motivo }}</p>
+  </div>
+  <a class="button" href="/anteprojetos/{{ anteprojeto.id }}#versoes">Voltar</a>
+</section>
+
+<section class="panel">
+  <h2>Dados da versao</h2>
+  <dl class="version-meta">
+    <div>
+      <dt>Data/hora</dt>
+      <dd>{{ versao.criado_em }}</dd>
+    </div>
+    <div>
+      <dt>Usuario</dt>
+      <dd>{{ versao.usuario_nome or "Sistema" }}</dd>
+    </div>
+    <div>
+      <dt>Motivo</dt>
+      <dd>{{ versao.motivo }}</dd>
+    </div>
+  </dl>
+</section>
+
+<section class="panel">
+  <h2>Anteprojeto</h2>
+  {% set dados = snapshot.anteprojeto %}
+  <dl class="field-summary snapshot-summary">
+    <div><dt>Cliente</dt><dd>{{ dados.cliente }}</dd></div>
+    <div><dt>Obra/local</dt><dd>{{ dados.obra_local }}</dd></div>
+    <div><dt>Tipo da obra</dt><dd>{{ dados.tipo_obra }}</dd></div>
+    <div><dt>Responsavel</dt><dd>{{ dados.responsavel }}</dd></div>
+    <div><dt>Status</dt><dd>{{ dados.status }}</dd></div>
+    <div><dt>Observacoes</dt><dd>{{ dados.observacoes_gerais or "-" }}</dd></div>
+  </dl>
+</section>
+
+<section class="panel">
+  <h2>Itens vinculados</h2>
+  {% if snapshot.itens %}
+  <div class="item-list">
+    {% for item in snapshot.itens %}
+    <article class="item-card">
+      <div>
+        <h3>{{ item.equipamento_nome }}</h3>
+        <p>{{ item.quantidade }} un. - {{ item.tipo_definicao }} - {{ item.situacao }}</p>
+        {% if item.campos %}
+        <dl class="field-summary">
+          {% for nome, valor in item.campos.items() %}
+            {% if valor %}
+            <div>
+              <dt>{{ nome }}</dt>
+              <dd>{% if valor is string %}{{ valor }}{% else %}{{ valor | join(", ") }}{% endif %}</dd>
+            </div>
+            {% endif %}
+          {% endfor %}
+        </dl>
+        {% endif %}
+        {% if item.observacao_inicial %}<p><strong>Obs. inicial:</strong> {{ item.observacao_inicial }}</p>{% endif %}
+        {% if item.retorno_engenharia %}<p><strong>Engenharia:</strong> {{ item.retorno_engenharia }}</p>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">Nenhum item estava vinculado nesta versao.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Snapshot JSON</h2>
+  <pre class="json-view">{{ snapshot_json_formatado }}</pre>
+</section>
+{% endblock %}

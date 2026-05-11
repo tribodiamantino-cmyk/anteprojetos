@@ -9,7 +9,13 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from .auth import autenticar_usuario, exigir_admin, exigir_login, hash_senha
-from .db import get_conn, init_db, registrar_historico_anteprojeto, touch_anteprojeto
+from .db import (
+    criar_versao_anteprojeto,
+    get_conn,
+    init_db,
+    registrar_historico_anteprojeto,
+    touch_anteprojeto,
+)
 from .pdf import gerar_pdf_anteprojeto
 
 
@@ -21,7 +27,22 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-STATUS_OPCOES = ["Rascunho", "Enviado para engenharia", "Retornado", "Revisado", "Finalizado"]
+STATUS_OPCOES = [
+    "Rascunho",
+    "Enviado para engenharia",
+    "Retornado",
+    "Revisado",
+    "Aprovado",
+    "Finalizado",
+    "Cancelado",
+]
+STATUS_GERA_VERSAO = {
+    "Enviado para engenharia": "Envio para engenharia",
+    "Retornado": "Retorno da engenharia",
+    "Aprovado": "Aprovacao",
+    "Finalizado": "Aprovacao/finalizacao",
+    "Cancelado": "Cancelamento",
+}
 TIPO_OBRA_OPCOES = ["Obra nova", "Reforma"]
 TIPO_DEFINICAO_OPCOES = ["Ja definido", "Parcialmente definido", "Engenharia dimensionar"]
 SITUACAO_REFORMA_OPCOES = ["Novo", "Existente", "Substituir", "Adequar", "Remover"]
@@ -232,6 +253,7 @@ def duplicar_anteprojeto(request: Request, anteprojeto_id: int):
             "criacao",
             f"Anteprojeto duplicado a partir do #{anteprojeto_id}",
         )
+        criar_versao_anteprojeto(conn, novo_id, usuario, "Versao inicial da copia")
     return RedirectResponse(f"/anteprojetos/{novo_id}", status_code=303)
 
 
@@ -645,6 +667,7 @@ def criar_anteprojeto(
             "criacao",
             "Anteprojeto criado",
         )
+        criar_versao_anteprojeto(conn, anteprojeto_id, usuario, "Versao inicial")
     return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
 
 
@@ -699,6 +722,15 @@ def editar_anteprojeto(
             """,
             (anteprojeto_id,),
         ).fetchall()
+        versoes = conn.execute(
+            """
+            SELECT id, numero_versao, usuario_nome, motivo, criado_em
+            FROM versoes_anteprojeto
+            WHERE anteprojeto_id = ?
+            ORDER BY numero_versao DESC
+            """,
+            (anteprojeto_id,),
+        ).fetchall()
 
     return templates.TemplateResponse(
         "anteprojeto_edit.html",
@@ -713,6 +745,7 @@ def editar_anteprojeto(
             "item_editando_campos": json.loads(item_editando["campos_json"]) if item_editando else {},
             "retorno_item": retorno_item,
             "historico": historico,
+            "versoes": versoes,
             "status_opcoes": STATUS_OPCOES,
             "tipo_obra_opcoes": TIPO_OBRA_OPCOES,
             "tipo_definicao_opcoes": TIPO_DEFINICAO_OPCOES,
@@ -747,15 +780,19 @@ def atualizar_anteprojeto(
             (cliente, obra_local, tipo_obra, responsavel, observacoes_gerais, status, anteprojeto_id),
         )
         descricao = "Dados gerais atualizados"
+        acao = "edicao"
         if anteprojeto_atual["status"] != status:
+            acao = "status_alterado"
             descricao = f"Status alterado de {anteprojeto_atual['status']} para {status}"
         registrar_historico_anteprojeto(
             conn,
             anteprojeto_id,
             usuario,
-            "edicao",
+            acao,
             descricao,
         )
+        if anteprojeto_atual["status"] != status and status in STATUS_GERA_VERSAO:
+            criar_versao_anteprojeto(conn, anteprojeto_id, usuario, STATUS_GERA_VERSAO[status])
     return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
 
 
@@ -898,6 +935,7 @@ def salvar_retorno_engenharia(
             "retorno_engenharia",
             "Retorno da engenharia alterado",
         )
+        criar_versao_anteprojeto(conn, anteprojeto_id, usuario, "Retorno da engenharia")
         touch_anteprojeto(conn, anteprojeto_id)
 
     return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
@@ -936,6 +974,14 @@ def pdf_anteprojeto(request: Request, anteprojeto_id: int):
         return usuario
     with get_conn() as conn:
         anteprojeto = get_anteprojeto_or_404(conn, anteprojeto_id)
+        criar_versao_anteprojeto(conn, anteprojeto_id, usuario, "Geracao de PDF final")
+        registrar_historico_anteprojeto(
+            conn,
+            anteprojeto_id,
+            usuario,
+            "pdf_final",
+            "PDF final gerado",
+        )
         itens = conn.execute(
             "SELECT * FROM itens_anteprojeto WHERE anteprojeto_id = ? ORDER BY tipo_definicao, equipamento_nome",
             (anteprojeto_id,),
@@ -944,3 +990,56 @@ def pdf_anteprojeto(request: Request, anteprojeto_id: int):
 
     headers = {"Content-Disposition": f'inline; filename="anteprojeto-{anteprojeto_id}.pdf"'}
     return StreamingResponse(buffer, media_type="application/pdf", headers=headers)
+
+
+@app.post("/anteprojetos/{anteprojeto_id}/versoes")
+def criar_versao_manual(
+    request: Request,
+    anteprojeto_id: int,
+    motivo: Annotated[str, Form()] = "Versao manual",
+):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    motivo = (motivo or "").strip() or "Versao manual"
+    with get_conn() as conn:
+        get_anteprojeto_or_404(conn, anteprojeto_id)
+        criar_versao_anteprojeto(conn, anteprojeto_id, usuario, motivo)
+        registrar_historico_anteprojeto(
+            conn,
+            anteprojeto_id,
+            usuario,
+            "versao_manual",
+            f"Nova versao criada: {motivo}",
+        )
+    return RedirectResponse(f"/anteprojetos/{anteprojeto_id}#versoes", status_code=303)
+
+
+@app.get("/anteprojetos/{anteprojeto_id}/versoes/{versao_id}", response_class=HTMLResponse)
+def visualizar_versao(request: Request, anteprojeto_id: int, versao_id: int):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    with get_conn() as conn:
+        anteprojeto = get_anteprojeto_or_404(conn, anteprojeto_id)
+        versao = conn.execute(
+            """
+            SELECT * FROM versoes_anteprojeto
+            WHERE id = ? AND anteprojeto_id = ?
+            """,
+            (versao_id, anteprojeto_id),
+        ).fetchone()
+        if not versao:
+            raise HTTPException(status_code=404, detail="Versao nao encontrada")
+
+    snapshot = json.loads(versao["snapshot_json"])
+    return templates.TemplateResponse(
+        "versao_anteprojeto.html",
+        {
+            "request": request,
+            "anteprojeto": anteprojeto,
+            "versao": versao,
+            "snapshot": snapshot,
+            "snapshot_json_formatado": json.dumps(snapshot, ensure_ascii=False, indent=2),
+        },
+    )
