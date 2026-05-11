@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Equipamentos</h1>
+    <p>Modelos e campos dinamicos usados nos anteprojetos.</p>
+  </div>
+  <a class="button primary" href="/equipamentos/novo">Novo Equipamento</a>
+</section>
+
+{% if equipamentos %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Ativo</th>
+        <th>Acoes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for equipamento in equipamentos %}
+      <tr>
+        <td>{{ equipamento.nome }}</td>
+        <td>
+          {% if equipamento.ativo %}
+          <span class="pill">Sim</span>
+          {% else %}
+          <span class="pill muted-pill">Nao</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="table-actions">
+            <a class="button small" href="/equipamentos/{{ equipamento.id }}/editar">Editar</a>
+            <form method="post" action="/equipamentos/{{ equipamento.id }}/duplicar">
+              <button class="button small" type="submit">Duplicar</button>
+            </form>
+            <form method="post" action="/equipamentos/{{ equipamento.id }}/inativar">
+              <button class="button small danger" type="submit">
+                {% if equipamento.ativo %}Inativar{% else %}Ativar{% endif %}
+              </button>
+            </form>
+            <form method="post" action="/equipamentos/{{ equipamento.id }}/excluir" onsubmit="return confirm('Excluir este equipamento? Esta acao so funciona se ele nao estiver em uso.')">
+              <button class="button small danger" type="submit">Excluir</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <h2>Nenhum equipamento cadastrado</h2>
+  <p>Crie o primeiro modelo para usar nos anteprojetos.</p>
+</div>
+{% endif %}
+{% endblock %}

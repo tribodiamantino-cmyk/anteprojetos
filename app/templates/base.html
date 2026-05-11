@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or "Anteprojetos" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Anteprojetos Agricolas</a>
+    <nav class="main-nav">
+      <a href="/" class="{% if request.url.path == '/' or request.url.path.startswith('/anteprojetos') %}active{% endif %}">Anteprojetos</a>
+      <a href="/equipamentos" class="{% if request.url.path.startswith('/equipamentos') %}active{% endif %}">Equipamentos</a>
+    </nav>
+  </header>
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', path='/js/app.js') }}"></script>
+</body>
+</html>

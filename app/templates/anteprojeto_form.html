@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Novo Anteprojeto</h1>
+    <p>Cadastre os dados principais da obra.</p>
+  </div>
+  <a class="button" href="/">Voltar</a>
+</section>
+
+<form class="panel form-grid" method="post" action="/anteprojetos">
+  <label>Cliente
+    <input name="cliente" required>
+  </label>
+  <label>Obra/local
+    <input name="obra_local" required>
+  </label>
+  <label>Tipo da obra
+    <select name="tipo_obra" required>
+      {% for opcao in tipo_obra_opcoes %}
+      <option value="{{ opcao }}">{{ opcao }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Responsavel
+    <input name="responsavel" required>
+  </label>
+  <label>Status
+    <select name="status">
+      {% for opcao in status_opcoes %}
+      <option value="{{ opcao }}">{{ opcao }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="full">Observacoes gerais
+    <textarea name="observacoes_gerais" rows="5"></textarea>
+  </label>
+  <div class="actions full">
+    <button class="button primary" type="submit">Criar anteprojeto</button>
+  </div>
+</form>
+{% endblock %}

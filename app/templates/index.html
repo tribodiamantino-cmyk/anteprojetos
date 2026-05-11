@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Anteprojetos</h1>
+    <p>Lista local de anteprojetos tecnicos de armazenagem.</p>
+  </div>
+  <a class="button primary" href="/anteprojetos/novo">Novo Anteprojeto</a>
+</section>
+
+{% if anteprojetos %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Cliente</th>
+        <th>Obra/local</th>
+        <th>Tipo da obra</th>
+        <th>Status</th>
+        <th>Data de criacao</th>
+        <th>Acoes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for anteprojeto in anteprojetos %}
+      <tr>
+        <td>{{ anteprojeto.cliente }}</td>
+        <td>{{ anteprojeto.obra_local }}</td>
+        <td>{{ anteprojeto.tipo_obra }}</td>
+        <td><span class="pill">{{ anteprojeto.status }}</span></td>
+        <td>{{ anteprojeto.created_at }}</td>
+        <td>
+          <div class="table-actions">
+            <a class="button small" href="/anteprojetos/{{ anteprojeto.id }}">Abrir</a>
+            <a class="button small" href="/anteprojetos/{{ anteprojeto.id }}">Editar</a>
+            <a class="button small" href="/anteprojetos/{{ anteprojeto.id }}/pdf" target="_blank">PDF</a>
+            <form method="post" action="/anteprojetos/{{ anteprojeto.id }}/duplicar">
+              <button class="button small" type="submit">Duplicar</button>
+            </form>
+            <form method="post" action="/anteprojetos/{{ anteprojeto.id }}/excluir" onsubmit="return confirm('Excluir este anteprojeto?')">
+              <button class="button small danger" type="submit">Excluir</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <h2>Nenhum anteprojeto cadastrado</h2>
+  <p>Comece criando um anteprojeto para a engenharia.</p>
+</div>
+{% endif %}
+{% endblock %}

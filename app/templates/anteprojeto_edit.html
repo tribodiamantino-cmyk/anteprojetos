@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>{{ anteprojeto.cliente }}</h1>
+    <p>{{ anteprojeto.obra_local }} - {{ anteprojeto.tipo_obra }}</p>
+  </div>
+  <div class="button-row">
+    <a class="button" href="/">Voltar</a>
+    <a class="button primary" href="/anteprojetos/{{ anteprojeto.id }}/pdf" target="_blank">Gerar PDF</a>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Dados do anteprojeto</h2>
+  <form class="form-grid" method="post" action="/anteprojetos/{{ anteprojeto.id }}">
+    <label>Cliente
+      <input name="cliente" value="{{ anteprojeto.cliente }}" required>
+    </label>
+    <label>Obra/local
+      <input name="obra_local" value="{{ anteprojeto.obra_local }}" required>
+    </label>
+    <label>Tipo da obra
+      <select name="tipo_obra" id="tipo-obra" required>
+        {% for opcao in tipo_obra_opcoes %}
+        <option value="{{ opcao }}" {% if anteprojeto.tipo_obra == opcao %}selected{% endif %}>{{ opcao }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Responsavel
+      <input name="responsavel" value="{{ anteprojeto.responsavel }}" required>
+    </label>
+    <label>Status
+      <select name="status">
+        {% for opcao in status_opcoes %}
+        <option value="{{ opcao }}" {% if anteprojeto.status == opcao %}selected{% endif %}>{{ opcao }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="full">Observacoes gerais
+      <textarea name="observacoes_gerais" rows="4">{{ anteprojeto.observacoes_gerais or "" }}</textarea>
+    </label>
+    <div class="actions full">
+      <button class="button primary" type="submit">Salvar dados</button>
+    </div>
+  </form>
+</section>
+
+{% if retorno_item %}
+<section class="panel return-panel" id="retorno">
+  <h2>Retorno da engenharia</h2>
+  <p>{{ retorno_item.equipamento_nome }} - {{ retorno_item.quantidade }} un. - {{ retorno_item.situacao }}</p>
+  <form method="post" action="/anteprojetos/{{ anteprojeto.id }}/itens/{{ retorno_item.id }}/retorno">
+    <label>Retorno da engenharia
+      <textarea name="retorno_engenharia" rows="5">{{ retorno_item.retorno_engenharia or "" }}</textarea>
+    </label>
+    <div class="actions">
+      <button class="button primary" type="submit">Salvar retorno</button>
+      <a class="button" href="/anteprojetos/{{ anteprojeto.id }}">Cancelar</a>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="section-head">
+    <div>
+      <h2>{% if item_editando %}Editar item{% else %}Adicionar equipamentos{% endif %}</h2>
+      <p>Abra um equipamento, preencha os dados conhecidos e adicione ao anteprojeto.</p>
+    </div>
+    {% if item_editando %}
+    <a class="button" href="/anteprojetos/{{ anteprojeto.id }}">Cancelar edicao</a>
+    {% endif %}
+  </div>
+
+  <div class="accordion-list">
+    {% for equipamento in equipamentos %}
+    {% set aberto = item_editando and item_editando.equipamento_modelo_id == equipamento.id %}
+    <article class="equipment-accordion {% if aberto %}open{% endif %}" data-equipment-id="{{ equipamento.id }}">
+      <button class="accordion-trigger" type="button" aria-expanded="{{ 'true' if aberto else 'false' }}">
+        <span class="check-dot"></span>
+        <span>{{ equipamento.nome }}</span>
+        <span class="accordion-symbol">+</span>
+      </button>
+
+      <div class="accordion-body">
+        <form class="item-form" method="post" action="/anteprojetos/{{ anteprojeto.id }}/itens" data-equipment-id="{{ equipamento.id }}">
+          {% if aberto %}
+          <input type="hidden" name="item_id" value="{{ item_editando.id }}">
+          {% endif %}
+          <input type="hidden" name="equipamento_modelo_id" value="{{ equipamento.id }}">
+
+          <div class="form-grid compact">
+            <label>Quantidade
+              <input type="number" name="quantidade" min="1" value="{{ item_editando.quantidade if aberto else 1 }}" required>
+            </label>
+            <label>Tipo de definicao
+              <select name="tipo_definicao">
+                {% for opcao in tipo_definicao_opcoes %}
+                <option value="{{ opcao }}" {% if aberto and item_editando.tipo_definicao == opcao %}selected{% endif %}>{{ opcao }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Situacao
+              <select name="situacao" class="situacao-select" data-current="{{ item_editando.situacao if aberto else '' }}"></select>
+            </label>
+          </div>
+
+          <div class="dynamic-fields" data-fields-for="{{ equipamento.id }}"></div>
+
+          <label>Observacao inicial
+            <textarea name="observacao_inicial" rows="3">{{ item_editando.observacao_inicial if aberto else "" }}</textarea>
+          </label>
+
+          <div class="actions">
+            <button class="button primary" type="submit">
+              {% if aberto %}Salvar alteracoes{% else %}Adicionar ao anteprojeto{% endif %}
+            </button>
+          </div>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Itens adicionados</h2>
+  {% if itens %}
+    {% for tipo in tipo_definicao_opcoes %}
+    <div class="item-group">
+      <div class="item-group-head">
+        <h3>{{ tipo }}</h3>
+        <span class="count-pill">{{ itens_por_tipo.get(tipo, []) | length }}</span>
+      </div>
+
+      {% if itens_por_tipo.get(tipo) %}
+      <div class="item-list">
+        {% for item in itens_por_tipo[tipo] %}
+        <article class="item-card">
+          <div>
+            <h3>{{ item.equipamento_nome }}</h3>
+            <p>{{ item.quantidade }} un. - {{ item.situacao }}</p>
+            {% if item.campos %}
+            <dl class="field-summary">
+              {% for nome, valor in item.campos.items() %}
+                {% if valor %}
+                <div>
+                  <dt>{{ nome }}</dt>
+                  <dd>{% if valor is string %}{{ valor }}{% else %}{{ valor | join(", ") }}{% endif %}</dd>
+                </div>
+                {% endif %}
+              {% endfor %}
+            </dl>
+            {% endif %}
+            {% if item.observacao_inicial %}<p><strong>Obs. inicial:</strong> {{ item.observacao_inicial }}</p>{% endif %}
+            {% if item.retorno_engenharia %}<p><strong>Engenharia:</strong> {{ item.retorno_engenharia }}</p>{% endif %}
+          </div>
+          <div class="item-actions">
+            <a class="button small" href="/anteprojetos/{{ anteprojeto.id }}?item_id={{ item.id }}">Editar</a>
+            <a class="button small" href="/anteprojetos/{{ anteprojeto.id }}?retorno_item_id={{ item.id }}#retorno">Adicionar retorno da engenharia</a>
+            <form method="post" action="/anteprojetos/{{ anteprojeto.id }}/itens/{{ item.id }}/remover" onsubmit="return confirm('Remover este item?')">
+              <button class="button small danger" type="submit">Remover</button>
+            </form>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">Nenhum item neste grupo.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="muted">Nenhum item adicionado ainda.</p>
+  {% endif %}
+</section>
+
+<script>
+  window.EQUIPAMENTOS = {{ equipamentos_json | safe }};
+  window.ANTEPROJETO_TIPO_OBRA = {{ anteprojeto.tipo_obra | tojson }};
+  window.ITEM_EDITANDO_CAMPOS = {{ item_editando_campos | tojson }};
+  window.ITEM_EDITANDO_EQUIPAMENTO_ID = {{ item_editando.equipamento_modelo_id if item_editando else "null" }};
+</script>
+{% endblock %}
