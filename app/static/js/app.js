@@ -157,7 +157,9 @@
   const finalInput = document.getElementById("equipamento-final-id");
   const pathBox = document.getElementById("equipamento-caminho-selecionado");
   const attrsBox = document.getElementById("equipamento-atributos-carregados");
+  const optionsBox = document.getElementById("equipamento-opcoes-carregadas");
   const selectedChain = window.ITEM_EDITANDO_CADEIA || [];
+  const selectedOptions = window.ITEM_EDITANDO_OPCOES || {};
 
   function resetSelect(select, placeholder) {
     select.innerHTML = "";
@@ -234,6 +236,75 @@
     renderAttributes(attrs);
   }
 
+  function renderOptions(options) {
+    optionsBox.innerHTML = "";
+    if (!options.length) {
+      optionsBox.innerHTML = '<p class="muted">Nenhum acessorio/opcional cadastrado para este item.</p>';
+      return;
+    }
+
+    const title = document.createElement("h3");
+    title.textContent = "Acessorios e opcionais";
+    optionsBox.appendChild(title);
+
+    const grid = document.createElement("div");
+    grid.className = "options-grid";
+
+    options.forEach((option) => {
+      const saved = selectedOptions[String(option.id)] || {};
+      const label = document.createElement("label");
+      label.textContent = option.nome;
+
+      if (option.tipo === "booleano") {
+        label.className = "option-check";
+        label.textContent = "";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.name = `opcao__${option.id}`;
+        input.value = "sim";
+        input.checked = saved.valor === "sim";
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(`${option.nome}: Sim`));
+      } else if (option.tipo === "selecao") {
+        const select = document.createElement("select");
+        select.name = `opcao__${option.id}`;
+        select.required = Boolean(option.obrigatorio);
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "Selecione";
+        select.appendChild(empty);
+        (option.valores || []).forEach((value) => {
+          const item = document.createElement("option");
+          item.value = value.valor;
+          item.textContent = value.rotulo;
+          item.selected = saved.valor === value.valor;
+          select.appendChild(item);
+        });
+        label.appendChild(select);
+      } else {
+        const input = document.createElement("input");
+        input.name = `opcao__${option.id}`;
+        input.type = option.tipo === "numero" ? "number" : "text";
+        input.value = saved.valor || "";
+        input.required = Boolean(option.obrigatorio);
+        label.appendChild(input);
+      }
+
+      grid.appendChild(label);
+    });
+
+    optionsBox.appendChild(grid);
+  }
+
+  async function loadOptions(equipmentId) {
+    if (!equipmentId) {
+      optionsBox.innerHTML = "";
+      return;
+    }
+    const options = await fetchJson(`/equipamentos/${equipmentId}/opcoes`);
+    renderOptions(options);
+  }
+
   async function loadChildren(level, parentId, selectedId) {
     const next = selects[level + 1];
     if (!next) return [];
@@ -252,6 +323,7 @@
     const selectedId = selects[level].value;
     finalInput.value = "";
     attrsBox.innerHTML = "";
+    optionsBox.innerHTML = "";
 
     if (!selectedId) {
       for (let index = level + 1; index < selects.length; index += 1) {
@@ -265,6 +337,7 @@
     if (!children.length || level === selects.length - 1) {
       finalInput.value = selectedId;
       await loadAttributes(selectedId);
+      await loadOptions(selectedId);
     }
     updatePath();
   }
@@ -294,12 +367,15 @@
       await loadChildren(1, selectedChain[1].id, selectedChain[2].id);
       finalInput.value = selectedChain[selectedChain.length - 1].id;
       await loadAttributes(finalInput.value);
+      await loadOptions(finalInput.value);
     } else if (selectedChain[1]) {
       finalInput.value = selectedChain[1].id;
       await loadAttributes(finalInput.value);
+      await loadOptions(finalInput.value);
     } else {
       finalInput.value = selectedChain[0].id;
       await loadAttributes(finalInput.value);
+      await loadOptions(finalInput.value);
     }
     updatePath();
   }

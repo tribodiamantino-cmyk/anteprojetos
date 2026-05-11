@@ -37,6 +37,15 @@ def _format_campos(campos_json):
     return "<br/>".join(linhas) if linhas else "Sem especificacoes preenchidas."
 
 
+def _format_opcoes(opcoes):
+    linhas = []
+    for opcao in opcoes or []:
+        valor = opcao.get("valor_rotulo") or opcao.get("valor") or ""
+        if valor:
+            linhas.append(f"<b>{opcao['opcao_nome']}:</b> {valor}")
+    return "<br/>".join(linhas)
+
+
 def gerar_pdf_anteprojeto(anteprojeto, itens):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -95,6 +104,9 @@ def gerar_pdf_anteprojeto(anteprojeto, itens):
         for item in grupo:
             titulo = f"{item['quantidade']} un. - {item['equipamento_nome']} - {item['situacao']}"
             detalhes = [_format_campos(item["campos_json"])]
+            opcoes = _format_opcoes(item.get("opcoes"))
+            if opcoes:
+                detalhes.append(f"<b>Acessorios e opcionais:</b><br/>{opcoes}")
             if item["observacao_inicial"]:
                 detalhes.append(f"<b>Observacao inicial:</b> {item['observacao_inicial']}")
             if item["retorno_engenharia"]:

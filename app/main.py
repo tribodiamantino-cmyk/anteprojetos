@@ -15,6 +15,7 @@ from .db import (
     init_db,
     normalize_chave,
     obter_caminho_equipamento,
+    obter_opcoes_disponiveis,
     registrar_historico_anteprojeto,
     touch_anteprojeto,
 )
@@ -194,7 +195,66 @@ def collect_campos(form, equipamento_schema):
 def parse_item(row):
     item = dict(row)
     item["campos"] = json.loads(item["campos_json"] or "{}")
+    item["opcoes"] = []
     return item
+
+
+def carregar_opcoes_itens(conn, itens):
+    for item in itens:
+        opcoes = conn.execute(
+            """
+            SELECT * FROM itens_anteprojeto_opcoes
+            WHERE item_anteprojeto_id = ?
+            ORDER BY id
+            """,
+            (item["id"],),
+        ).fetchall()
+        item["opcoes"] = [dict(opcao) for opcao in opcoes]
+    return itens
+
+
+def opcoes_item_map(conn, item_id):
+    opcoes = conn.execute(
+        """
+        SELECT opcao_id, valor, valor_rotulo
+        FROM itens_anteprojeto_opcoes
+        WHERE item_anteprojeto_id = ?
+        """,
+        (item_id,),
+    ).fetchall()
+    return {str(opcao["opcao_id"]): {"valor": opcao["valor"], "valor_rotulo": opcao["valor_rotulo"]} for opcao in opcoes}
+
+
+def salvar_opcoes_item(conn, item_id, equipamento_id, form):
+    conn.execute("DELETE FROM itens_anteprojeto_opcoes WHERE item_anteprojeto_id = ?", (item_id,))
+    opcoes = obter_opcoes_disponiveis(conn, equipamento_id)
+    for opcao in opcoes:
+        field_name = f"opcao__{opcao['id']}"
+        valor = ""
+        valor_rotulo = ""
+
+        if opcao["tipo"] == "booleano":
+            valor = "sim" if form.get(field_name) == "sim" else "nao"
+            valor_rotulo = "Sim" if valor == "sim" else "Nao"
+        else:
+            valor = (form.get(field_name) or "").strip()
+            if not valor and not opcao["obrigatorio"]:
+                continue
+            valor_rotulo = valor
+            if opcao["tipo"] == "selecao":
+                for alternativa in opcao["valores"]:
+                    if alternativa["valor"] == valor:
+                        valor_rotulo = alternativa["rotulo"]
+                        break
+
+        conn.execute(
+            """
+            INSERT INTO itens_anteprojeto_opcoes
+            (item_anteprojeto_id, opcao_id, opcao_nome, opcao_chave, valor, valor_rotulo)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (item_id, opcao["id"], opcao["nome"], opcao["chave"], valor, valor_rotulo),
+        )
 
 
 def normalize_equipamento_schema(nome, campos):
@@ -767,6 +827,26 @@ def atributos_equipamento(request: Request, equipamento_id: int):
     return [dict(row) for row in atributos]
 
 
+@app.get("/equipamentos/{equipamento_id}/opcoes")
+def opcoes_equipamento(request: Request, equipamento_id: int):
+    usuario = exigir_login(request)
+    if isinstance(usuario, RedirectResponse):
+        return usuario
+    with get_conn() as conn:
+        opcoes = obter_opcoes_disponiveis(conn, equipamento_id)
+    return [
+        {
+            "id": opcao["id"],
+            "nome": opcao["nome"],
+            "chave": opcao["chave"],
+            "tipo": opcao["tipo"],
+            "obrigatorio": opcao["obrigatorio"],
+            "valores": opcao["valores"],
+        }
+        for opcao in opcoes
+    ]
+
+
 @app.get("/equipamentos/{equipamento_id}", response_class=HTMLResponse)
 def visualizar_equipamento(request: Request, equipamento_id: int):
     usuario = exigir_login(request)
@@ -1064,13 +1144,14 @@ def editar_anteprojeto(
             """,
             (anteprojeto_id,),
         ).fetchall()
-        itens = [parse_item(row) for row in itens_rows]
+        itens = carregar_opcoes_itens(conn, [parse_item(row) for row in itens_rows])
         itens_por_tipo = {tipo: [] for tipo in TIPO_DEFINICAO_OPCOES}
         for item in itens:
             itens_por_tipo.setdefault(item["tipo_definicao"], []).append(item)
 
         item_editando = None
         item_editando_cadeia = []
+        item_editando_opcoes = {}
         if item_id:
             item_editando = conn.execute(
                 "SELECT * FROM itens_anteprojeto WHERE id = ? AND anteprojeto_id = ?",
@@ -1078,6 +1159,7 @@ def editar_anteprojeto(
             ).fetchone()
             if item_editando:
                 item_editando_cadeia = obter_cadeia_equipamento(conn, item_editando["equipamento_modelo_id"])
+                item_editando_opcoes = opcoes_item_map(conn, item_editando["id"])
         retorno_item = None
         if retorno_item_id:
             retorno_item = conn.execute(
@@ -1112,6 +1194,7 @@ def editar_anteprojeto(
             "itens_por_tipo": itens_por_tipo,
             "item_editando": item_editando,
             "item_editando_cadeia": item_editando_cadeia,
+            "item_editando_opcoes": item_editando_opcoes,
             "item_editando_campos": json.loads(item_editando["campos_json"]) if item_editando else {},
             "retorno_item": retorno_item,
             "historico": historico,
@@ -1226,6 +1309,7 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 "INSERT INTO historico_item (item_id, descricao) VALUES (?, ?)",
                 (item_id, "Item editado"),
             )
+            salvar_opcoes_item(conn, int(item_id), equipamento_id, form)
             registrar_historico_anteprojeto(
                 conn,
                 anteprojeto_id,
@@ -1257,6 +1341,7 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 "INSERT INTO historico_item (item_id, descricao) VALUES (?, ?)",
                 (cur.lastrowid, "Item adicionado"),
             )
+            salvar_opcoes_item(conn, cur.lastrowid, equipamento_id, form)
             registrar_historico_anteprojeto(
                 conn,
                 anteprojeto_id,
@@ -1357,6 +1442,7 @@ def pdf_anteprojeto(request: Request, anteprojeto_id: int):
             "SELECT * FROM itens_anteprojeto WHERE anteprojeto_id = ? ORDER BY tipo_definicao, equipamento_nome",
             (anteprojeto_id,),
         ).fetchall()
+        itens = carregar_opcoes_itens(conn, [dict(item) for item in itens])
         buffer = gerar_pdf_anteprojeto(anteprojeto, itens)
 
     headers = {"Content-Disposition": f'inline; filename="anteprojeto-{anteprojeto_id}.pdf"'}

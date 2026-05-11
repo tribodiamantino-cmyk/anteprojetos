@@ -102,6 +102,7 @@
 
     <div class="cascade-path" id="equipamento-caminho-selecionado"></div>
     <div class="loaded-attributes" id="equipamento-atributos-carregados"></div>
+    <div class="loaded-options" id="equipamento-opcoes-carregadas"></div>
 
     <div class="form-grid compact">
       <label>Quantidade
@@ -161,6 +162,16 @@
             </dl>
             {% endif %}
             {% if item.observacao_inicial %}<p><strong>Obs. inicial:</strong> {{ item.observacao_inicial }}</p>{% endif %}
+            {% if item.opcoes %}
+            <div class="item-options">
+              <strong>Acessorios:</strong>
+              <ul>
+                {% for opcao in item.opcoes %}
+                <li>{{ opcao.opcao_nome }}: {{ opcao.valor_rotulo or opcao.valor or "-" }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endif %}
             {% if item.retorno_engenharia %}<p><strong>Engenharia:</strong> {{ item.retorno_engenharia }}</p>{% endif %}
           </div>
           <div class="item-actions">
@@ -253,5 +264,6 @@
 <script>
   window.ANTEPROJETO_TIPO_OBRA = {{ anteprojeto.tipo_obra | tojson }};
   window.ITEM_EDITANDO_CADEIA = {{ item_editando_cadeia | tojson }};
+  window.ITEM_EDITANDO_OPCOES = {{ item_editando_opcoes | tojson }};
 </script>
 {% endblock %}
