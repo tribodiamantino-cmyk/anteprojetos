@@ -117,6 +117,16 @@ def init_db():
                 UNIQUE (opcao_id, valor)
             );
 
+            CREATE TABLE IF NOT EXISTS equipamentos_opcoes_dependencias (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                opcao_id INTEGER NOT NULL,
+                depende_opcao_id INTEGER NOT NULL,
+                depende_valor TEXT NOT NULL,
+                FOREIGN KEY (opcao_id) REFERENCES equipamentos_opcoes(id) ON DELETE CASCADE,
+                FOREIGN KEY (depende_opcao_id) REFERENCES equipamentos_opcoes(id) ON DELETE CASCADE,
+                UNIQUE (opcao_id)
+            );
+
             CREATE TABLE IF NOT EXISTS itens_anteprojeto_opcoes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 item_anteprojeto_id INTEGER NOT NULL,
@@ -410,7 +420,12 @@ def seed_silo_fundo_plano_evo50_exemplo(conn):
         ("Silo Fundo Plano EVO 50",),
     ).fetchone()
     if existente:
-        seed_opcoes_silo_evo50(conn, existente["id"])
+        total_opcoes = conn.execute(
+            "SELECT COUNT(*) FROM equipamentos_opcoes WHERE equipamento_id = ?",
+            (existente["id"],),
+        ).fetchone()[0]
+        if not total_opcoes:
+            seed_opcoes_silo_evo50(conn, existente["id"])
         return
 
     silo_id = insert_equipamento_seed(
@@ -580,6 +595,16 @@ def obter_opcoes_disponiveis(conn, equipamento_id):
             ).fetchall()
             data = dict(opcao)
             data["valores"] = [dict(valor) for valor in valores]
+            dependencia = conn.execute(
+                """
+                SELECT d.depende_opcao_id, d.depende_valor, o.chave AS depende_chave
+                FROM equipamentos_opcoes_dependencias d
+                JOIN equipamentos_opcoes o ON o.id = d.depende_opcao_id
+                WHERE d.opcao_id = ?
+                """,
+                (opcao["id"],),
+            ).fetchone()
+            data["dependencia"] = dict(dependencia) if dependencia else None
             opcoes_por_chave[opcao["chave"]] = data
 
     return sorted(opcoes_por_chave.values(), key=lambda item: (item["ordem"], item["nome"], item["id"]))

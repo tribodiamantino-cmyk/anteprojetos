@@ -104,6 +104,62 @@
     {% endfor %}
   </div>
 
+  <div class="section-head field-editor-head">
+    <div>
+      <h2>Acessorios e opcionais</h2>
+      <p>Cadastre no item pai para os filhos herdarem. Use dependencia para mostrar um acessorio apenas quando outro tiver certo valor.</p>
+    </div>
+    <button class="button" type="button" id="add-option-button">Adicionar acessorio</button>
+  </div>
+
+  <div class="attribute-editor atributos-lista" id="option-editor">
+    {% for opcao in opcoes_equipamento %}
+    <div class="atributo-card option-card" data-option-row>
+      <div class="atributo-card-header">
+        <strong>Acessorio/opcional #{{ loop.index }}</strong>
+        <button class="button small danger remove-option-button" type="button">Remover acessorio</button>
+      </div>
+      <div class="atributo-grid">
+        <label>Nome
+          <input name="op_nome" value="{{ opcao.nome }}" required>
+        </label>
+        <label>Chave interna
+          <input name="op_chave" value="{{ opcao.chave }}" required>
+        </label>
+        <label>Tipo
+          <select name="op_tipo">
+            {% for tipo in tipos_opcao %}
+            <option value="{{ tipo }}" {% if opcao.tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Ordem
+          <input type="number" name="op_ordem" value="{{ opcao.ordem or loop.index }}" min="0">
+        </label>
+        <label>Depende da chave
+          <input name="op_depende_chave" value="{{ opcao.depende_chave or '' }}" placeholder="ex.: escada">
+        </label>
+        <label>Depende do valor
+          <input name="op_depende_valor" value="{{ opcao.depende_valor or '' }}" placeholder="ex.: caracol">
+        </label>
+        <label class="full">Valores para selecao
+          <textarea name="op_valores" rows="4" placeholder="marinheiro | Marinheiro&#10;caracol | Caracol">{{ opcao.valores_texto or "" }}</textarea>
+        </label>
+        <div class="checkbox-row full">
+          <label>
+            <input type="checkbox" name="op_obrigatorio" value="{{ loop.index0 }}" {% if opcao.obrigatorio %}checked{% endif %}>
+            Obrigatorio
+          </label>
+          <label>
+            <input type="checkbox" name="op_ativo" value="{{ loop.index0 }}" {% if opcao.ativo %}checked{% endif %}>
+            Ativo
+          </label>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
   <div class="actions">
     <button class="button primary" type="submit">Salvar</button>
     <a class="button" href="/equipamentos">Cancelar</a>
@@ -147,6 +203,52 @@
         <label>
           <input type="checkbox" name="attr_visivel_resumo" checked>
           Aparece no resumo
+        </label>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="option-row-template">
+  <div class="atributo-card option-card" data-option-row>
+    <div class="atributo-card-header">
+      <strong>Acessorio/opcional</strong>
+      <button class="button small danger remove-option-button" type="button">Remover acessorio</button>
+    </div>
+    <div class="atributo-grid">
+      <label>Nome
+        <input name="op_nome" required>
+      </label>
+      <label>Chave interna
+        <input name="op_chave" required>
+      </label>
+      <label>Tipo
+        <select name="op_tipo">
+          {% for tipo in tipos_opcao %}
+          <option value="{{ tipo }}">{{ tipo }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Ordem
+        <input type="number" name="op_ordem" min="0">
+      </label>
+      <label>Depende da chave
+        <input name="op_depende_chave" placeholder="ex.: escada">
+      </label>
+      <label>Depende do valor
+        <input name="op_depende_valor" placeholder="ex.: caracol">
+      </label>
+      <label class="full">Valores para selecao
+        <textarea name="op_valores" rows="4" placeholder="marinheiro | Marinheiro&#10;caracol | Caracol"></textarea>
+      </label>
+      <div class="checkbox-row full">
+        <label>
+          <input type="checkbox" name="op_obrigatorio">
+          Obrigatorio
+        </label>
+        <label>
+          <input type="checkbox" name="op_ativo" checked>
+          Ativo
         </label>
       </div>
     </div>

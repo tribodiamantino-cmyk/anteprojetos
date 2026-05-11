@@ -107,6 +107,79 @@
 })();
 
 (function () {
+  const optionEditor = document.getElementById("option-editor");
+  const addOptionButton = document.getElementById("add-option-button");
+  const optionTemplate = document.getElementById("option-row-template");
+
+  if (!optionEditor || !addOptionButton || !optionTemplate) return;
+
+  function slug(value) {
+    return (value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "opcao";
+  }
+
+  function rows() {
+    return Array.from(optionEditor.querySelectorAll("[data-option-row]"));
+  }
+
+  function reindex() {
+    rows().forEach((row, index) => {
+      const title = row.querySelector(".atributo-card-header strong");
+      const ordem = row.querySelector("input[name='op_ordem']");
+      const obrigatorio = row.querySelector("input[name='op_obrigatorio']");
+      const ativo = row.querySelector("input[name='op_ativo']");
+      if (title) title.textContent = `Acessorio/opcional #${index + 1}`;
+      if (ordem && !ordem.value) ordem.value = index + 1;
+      if (obrigatorio) obrigatorio.value = String(index);
+      if (ativo) ativo.value = String(index);
+    });
+  }
+
+  function bindRow(row) {
+    const nome = row.querySelector("input[name='op_nome']");
+    const chave = row.querySelector("input[name='op_chave']");
+    const dependeChave = row.querySelector("input[name='op_depende_chave']");
+    const remove = row.querySelector(".remove-option-button");
+
+    if (nome && chave) {
+      nome.addEventListener("input", () => {
+        if (!chave.dataset.edited) chave.value = slug(nome.value);
+      });
+      chave.addEventListener("input", () => {
+        chave.dataset.edited = "true";
+        chave.value = slug(chave.value);
+      });
+    }
+    if (dependeChave) {
+      dependeChave.addEventListener("input", () => {
+        dependeChave.value = slug(dependeChave.value);
+      });
+    }
+    if (remove) {
+      remove.addEventListener("click", () => {
+        row.remove();
+        reindex();
+      });
+    }
+  }
+
+  rows().forEach(bindRow);
+  reindex();
+
+  addOptionButton.addEventListener("click", () => {
+    const fragment = optionTemplate.content.cloneNode(true);
+    const row = fragment.querySelector("[data-option-row]");
+    optionEditor.appendChild(fragment);
+    bindRow(row);
+    reindex();
+  });
+})();
+
+(function () {
   const tipoObraSelect = document.getElementById("tipo-obra");
 
   function currentTipoObra() {
@@ -253,11 +326,22 @@
     options.forEach((option) => {
       const saved = selectedOptions[String(option.id)] || {};
       const label = document.createElement("label");
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = `opcao_presente__${option.id}`;
+      hidden.value = "1";
+      label.dataset.optionId = String(option.id);
+      if (option.dependencia) {
+        label.dataset.dependsOptionId = String(option.dependencia.depende_opcao_id);
+        label.dataset.dependsValue = option.dependencia.depende_valor;
+      }
       label.textContent = option.nome;
+      label.appendChild(hidden);
 
       if (option.tipo === "booleano") {
         label.className = "option-check";
         label.textContent = "";
+        label.appendChild(hidden);
         const input = document.createElement("input");
         input.type = "checkbox";
         input.name = `opcao__${option.id}`;
@@ -294,6 +378,44 @@
     });
 
     optionsBox.appendChild(grid);
+    bindOptionDependencies();
+  }
+
+  function optionValue(optionId) {
+    const field = optionsBox.querySelector(`[name="opcao__${optionId}"]`);
+    if (!field) return "";
+    if (field.type === "checkbox") return field.checked ? "sim" : "nao";
+    return field.value || "";
+  }
+
+  function setOptionEnabled(label, enabled) {
+    label.hidden = !enabled;
+    label.querySelectorAll("input, select, textarea").forEach((field) => {
+      field.disabled = !enabled;
+      if (!enabled && field.type === "checkbox") field.checked = false;
+      if (!enabled && field.tagName !== "INPUT") field.value = "";
+      if (!enabled && field.type !== "hidden" && field.type !== "checkbox") field.value = "";
+    });
+  }
+
+  function applyOptionDependencies() {
+    optionsBox.querySelectorAll("[data-option-id]").forEach((label) => {
+      const dependsOptionId = label.dataset.dependsOptionId;
+      const dependsValue = label.dataset.dependsValue;
+      if (!dependsOptionId || !dependsValue) {
+        setOptionEnabled(label, true);
+        return;
+      }
+      setOptionEnabled(label, optionValue(dependsOptionId) === dependsValue);
+    });
+  }
+
+  function bindOptionDependencies() {
+    optionsBox.querySelectorAll("input, select, textarea").forEach((field) => {
+      field.addEventListener("change", applyOptionDependencies);
+      field.addEventListener("input", applyOptionDependencies);
+    });
+    applyOptionDependencies();
   }
 
   async function loadOptions(equipmentId) {

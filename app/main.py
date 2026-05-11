@@ -51,6 +51,7 @@ TIPO_DEFINICAO_OPCOES = ["Ja definido", "Parcialmente definido", "Engenharia dim
 SITUACAO_REFORMA_OPCOES = ["Novo", "Existente", "Substituir", "Adequar", "Remover"]
 TIPOS_CAMPO_EQUIPAMENTO = ["text", "number", "select", "checkbox", "textarea", "info"]
 TIPOS_ATRIBUTO_EQUIPAMENTO = ["texto", "numero", "inteiro", "booleano", "lista", "json"]
+TIPOS_OPCAO_EQUIPAMENTO = ["booleano", "selecao", "texto", "numero"]
 
 
 @app.on_event("startup")
@@ -229,7 +230,10 @@ def salvar_opcoes_item(conn, item_id, equipamento_id, form):
     conn.execute("DELETE FROM itens_anteprojeto_opcoes WHERE item_anteprojeto_id = ?", (item_id,))
     opcoes = obter_opcoes_disponiveis(conn, equipamento_id)
     for opcao in opcoes:
+        present_name = f"opcao_presente__{opcao['id']}"
         field_name = f"opcao__{opcao['id']}"
+        if form.get(present_name) != "1":
+            continue
         valor = ""
         valor_rotulo = ""
 
@@ -255,6 +259,199 @@ def salvar_opcoes_item(conn, item_id, equipamento_id, form):
             """,
             (item_id, opcao["id"], opcao["nome"], opcao["chave"], valor, valor_rotulo),
         )
+
+
+def get_opcoes_cadastradas_equipamento(conn, equipamento_id):
+    opcoes = conn.execute(
+        """
+        SELECT * FROM equipamentos_opcoes
+        WHERE equipamento_id = ?
+        ORDER BY ordem, nome, id
+        """,
+        (equipamento_id,),
+    ).fetchall()
+    resultado = []
+    for opcao in opcoes:
+        item = dict(opcao)
+        valores = conn.execute(
+            """
+            SELECT valor, rotulo, ordem, ativo
+            FROM equipamentos_opcoes_valores
+            WHERE opcao_id = ?
+            ORDER BY ordem, id
+            """,
+            (opcao["id"],),
+        ).fetchall()
+        item["valores"] = [dict(valor) for valor in valores if valor["ativo"]]
+        item["valores_texto"] = "\n".join(
+            f"{valor['valor']} | {valor['rotulo']}" if valor["valor"] != valor["rotulo"] else valor["rotulo"]
+            for valor in valores
+            if valor["ativo"]
+        )
+        dependencia = conn.execute(
+            """
+            SELECT o.chave AS depende_chave, d.depende_valor
+            FROM equipamentos_opcoes_dependencias d
+            JOIN equipamentos_opcoes o ON o.id = d.depende_opcao_id
+            WHERE d.opcao_id = ?
+            """,
+            (opcao["id"],),
+        ).fetchone()
+        item["depende_chave"] = dependencia["depende_chave"] if dependencia else ""
+        item["depende_valor"] = dependencia["depende_valor"] if dependencia else ""
+        resultado.append(item)
+    return resultado
+
+
+def parse_opcao_valores(raw):
+    valores = []
+    for index, line in enumerate((raw or "").replace("\r", "").split("\n"), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        if "|" in line:
+            valor, rotulo = [part.strip() for part in line.split("|", 1)]
+        else:
+            rotulo = line
+            valor = normalize_chave(line)
+        if valor and rotulo:
+            valores.append({"valor": valor, "rotulo": rotulo, "ordem": index})
+    return valores
+
+
+def opcoes_from_form(form):
+    nomes = form.getlist("op_nome")
+    chaves = form.getlist("op_chave")
+    tipos = form.getlist("op_tipo")
+    obrigatorios = set(form.getlist("op_obrigatorio"))
+    ativos = set(form.getlist("op_ativo"))
+    ordens = form.getlist("op_ordem")
+    valores_texto = form.getlist("op_valores")
+    depende_chaves = form.getlist("op_depende_chave")
+    depende_valores = form.getlist("op_depende_valor")
+    opcoes = []
+    usadas = set()
+
+    for index, nome in enumerate(nomes):
+        nome = (nome or "").strip()
+        if not nome:
+            continue
+        chave_base = (chaves[index] if index < len(chaves) else "").strip() or normalize_chave(nome)
+        chave = normalize_chave(chave_base)
+        original = chave
+        suffix = 2
+        while chave in usadas:
+            chave = f"{original}_{suffix}"
+            suffix += 1
+        usadas.add(chave)
+
+        tipo = tipos[index] if index < len(tipos) else "booleano"
+        if tipo not in TIPOS_OPCAO_EQUIPAMENTO:
+            tipo = "booleano"
+        try:
+            ordem = int(ordens[index]) if index < len(ordens) and ordens[index] else index + 1
+        except ValueError:
+            ordem = index + 1
+        row_key = str(index)
+
+        opcoes.append(
+            {
+                "nome": nome,
+                "chave": chave,
+                "tipo": tipo,
+                "obrigatorio": 1 if row_key in obrigatorios else 0,
+                "ativo": 1 if row_key in ativos else 0,
+                "ordem": ordem,
+                "valores": parse_opcao_valores(valores_texto[index] if index < len(valores_texto) else ""),
+                "depende_chave": normalize_chave(depende_chaves[index]) if index < len(depende_chaves) and depende_chaves[index] else "",
+                "depende_valor": (depende_valores[index] if index < len(depende_valores) else "").strip(),
+            }
+        )
+    return opcoes
+
+
+def salvar_opcoes_equipamento(conn, equipamento_id, opcoes):
+    atuais = conn.execute(
+        "SELECT id, chave FROM equipamentos_opcoes WHERE equipamento_id = ?",
+        (equipamento_id,),
+    ).fetchall()
+    atuais_por_chave = {row["chave"]: row["id"] for row in atuais}
+    ids_mantidos = set()
+    ids_por_chave = {}
+
+    for opcao in opcoes:
+        opcao_id = atuais_por_chave.get(opcao["chave"])
+        if opcao_id:
+            conn.execute(
+                """
+                UPDATE equipamentos_opcoes
+                SET nome = ?, tipo = ?, obrigatorio = ?, ordem = ?, ativo = ?
+                WHERE id = ?
+                """,
+                (opcao["nome"], opcao["tipo"], opcao["obrigatorio"], opcao["ordem"], opcao["ativo"], opcao_id),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO equipamentos_opcoes
+                (equipamento_id, nome, chave, tipo, obrigatorio, ordem, ativo)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    equipamento_id,
+                    opcao["nome"],
+                    opcao["chave"],
+                    opcao["tipo"],
+                    opcao["obrigatorio"],
+                    opcao["ordem"],
+                    opcao["ativo"],
+                ),
+            )
+            opcao_id = cur.lastrowid
+        ids_mantidos.add(opcao_id)
+        ids_por_chave[opcao["chave"]] = opcao_id
+
+        conn.execute("DELETE FROM equipamentos_opcoes_valores WHERE opcao_id = ?", (opcao_id,))
+        for valor in opcao["valores"]:
+            conn.execute(
+                """
+                INSERT INTO equipamentos_opcoes_valores
+                (opcao_id, valor, rotulo, ordem, ativo)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (opcao_id, valor["valor"], valor["rotulo"], valor["ordem"], 1),
+            )
+
+    for row in atuais:
+        if row["id"] in ids_mantidos:
+            continue
+        total_usos = conn.execute(
+            "SELECT COUNT(*) FROM itens_anteprojeto_opcoes WHERE opcao_id = ?",
+            (row["id"],),
+        ).fetchone()[0]
+        if total_usos:
+            conn.execute("UPDATE equipamentos_opcoes SET ativo = 0 WHERE id = ?", (row["id"],))
+        else:
+            conn.execute("DELETE FROM equipamentos_opcoes WHERE id = ?", (row["id"],))
+
+    for opcao_id in ids_mantidos:
+        conn.execute(
+            "DELETE FROM equipamentos_opcoes_dependencias WHERE opcao_id = ? OR depende_opcao_id = ?",
+            (opcao_id, opcao_id),
+        )
+
+    for opcao in opcoes:
+        opcao_id = ids_por_chave.get(opcao["chave"])
+        depende_id = ids_por_chave.get(opcao["depende_chave"])
+        if opcao_id and depende_id and opcao_id != depende_id and opcao["depende_valor"]:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO equipamentos_opcoes_dependencias
+                (opcao_id, depende_opcao_id, depende_valor)
+                VALUES (?, ?, ?)
+                """,
+                (opcao_id, depende_id, opcao["depende_valor"]),
+            )
 
 
 def normalize_equipamento_schema(nome, campos):
@@ -787,6 +984,8 @@ def novo_equipamento(request: Request, parent_id: int | None = None):
             "equipamentos_pai": equipamentos_pai,
             "parent_id_selecionado": parent_id_selecionado,
             "tipos_atributo": TIPOS_ATRIBUTO_EQUIPAMENTO,
+            "opcoes_equipamento": [],
+            "tipos_opcao": TIPOS_OPCAO_EQUIPAMENTO,
         },
     )
 
@@ -842,6 +1041,7 @@ def opcoes_equipamento(request: Request, equipamento_id: int):
             "tipo": opcao["tipo"],
             "obrigatorio": opcao["obrigatorio"],
             "valores": opcao["valores"],
+            "dependencia": opcao["dependencia"],
         }
         for opcao in opcoes
     ]
@@ -885,6 +1085,7 @@ async def criar_equipamento(request: Request):
 
     schema = normalize_equipamento_schema(dados["nome"], [])
     atributos = atributos_from_form(form)
+    opcoes = opcoes_from_form(form)
     with get_conn() as conn:
         cur = conn.execute(
             """
@@ -905,6 +1106,7 @@ async def criar_equipamento(request: Request):
             ),
         )
         salvar_atributos_equipamento(conn, cur.lastrowid, atributos)
+        salvar_opcoes_equipamento(conn, cur.lastrowid, opcoes)
     return RedirectResponse(f"/equipamentos/{cur.lastrowid}/editar", status_code=303)
 
 
@@ -921,6 +1123,7 @@ def editar_equipamento(request: Request, equipamento_id: int):
             raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
         atributos = get_atributos_equipamento(conn, equipamento_id)
         equipamentos_pai = get_opcoes_pai_equipamento(conn, equipamento_id)
+        opcoes_equipamento = get_opcoes_cadastradas_equipamento(conn, equipamento_id)
     return templates.TemplateResponse(
         "equipamento_form.html",
         {
@@ -930,6 +1133,8 @@ def editar_equipamento(request: Request, equipamento_id: int):
             "equipamentos_pai": equipamentos_pai,
             "parent_id_selecionado": equipamento["parent_id"],
             "tipos_atributo": TIPOS_ATRIBUTO_EQUIPAMENTO,
+            "opcoes_equipamento": opcoes_equipamento,
+            "tipos_opcao": TIPOS_OPCAO_EQUIPAMENTO,
         },
     )
 
@@ -945,6 +1150,7 @@ async def atualizar_equipamento(request: Request, equipamento_id: int):
         raise HTTPException(status_code=400, detail="Nome do equipamento e obrigatorio")
 
     atributos = atributos_from_form(form)
+    opcoes = opcoes_from_form(form)
     with get_conn() as conn:
         equipamento = conn.execute(
             "SELECT id FROM equipamentos_modelo WHERE id = ?", (equipamento_id,)
@@ -973,6 +1179,7 @@ async def atualizar_equipamento(request: Request, equipamento_id: int):
             ),
         )
         salvar_atributos_equipamento(conn, equipamento_id, atributos)
+        salvar_opcoes_equipamento(conn, equipamento_id, opcoes)
     return RedirectResponse(f"/equipamentos/{equipamento_id}/editar", status_code=303)
 
 
@@ -1013,6 +1220,8 @@ def duplicar_equipamento(request: Request, equipamento_id: int):
         )
         atributos = get_atributos_equipamento(conn, equipamento_id)
         salvar_atributos_equipamento(conn, cur.lastrowid, [dict(attr) for attr in atributos])
+        opcoes = get_opcoes_cadastradas_equipamento(conn, equipamento_id)
+        salvar_opcoes_equipamento(conn, cur.lastrowid, opcoes)
     return RedirectResponse(f"/equipamentos/{cur.lastrowid}/editar", status_code=303)
 
 
