@@ -99,7 +99,7 @@
 
     <div class="form-grid compact" data-final-fields>
       <label>Quantidade
-        <input type="number" name="quantidade" min="1" value="{{ item_editando.quantidade if item_editando else 1 }}" required>
+        <input type="number" name="quantidade" min="1" value="{{ item_editando.quantidade if item_editando else 1 }}" data-quantidade-input required>
       </label>
       <label>Tipo de definicao
         <select name="tipo_definicao">

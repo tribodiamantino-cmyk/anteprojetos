@@ -233,6 +233,7 @@
   const optionsBox = document.getElementById("equipamento-opcoes-carregadas");
   const variationLabels = Array.from(form.querySelectorAll("[data-variation-level]"));
   const finalFields = Array.from(form.querySelectorAll("[data-final-fields]"));
+  const quantidadeInput = form.querySelector("[data-quantidade-input]");
   const selectedChain = window.ITEM_EDITANDO_CADEIA || [];
   const selectedOptions = window.ITEM_EDITANDO_OPCOES || {};
   const selectedCampos = window.ITEM_EDITANDO_CAMPOS || {};
@@ -1065,6 +1066,7 @@
       aeracao: selectedCampos.aeracao || "",
       taxa: selectedCampos.aeracao_taxa || "",
       escada: selectedCampos.escada || "",
+      alternarEscadas: selectedCampos.alternar_escadas || "",
       extras: (selectedCampos.escada_extras || []).map((item) => item.chave).filter(Boolean),
     };
 
@@ -1088,6 +1090,7 @@
       container.appendChild(hiddenInput("silo_aeracao", state.aeracao));
       container.appendChild(hiddenInput("silo_aeracao_taxa", state.taxa));
       container.appendChild(hiddenInput("silo_escada", state.escada));
+      container.appendChild(hiddenInput("silo_alternar_escadas", state.alternarEscadas));
       state.extras.forEach((extra) => container.appendChild(hiddenInput("silo_escada_extra", extra)));
     }
 
@@ -1204,7 +1207,13 @@
       if (state.termometria === "sem" || state.pacote) wrap.appendChild(renderStep("Sensor de Nível", siloPulmaoConfig.simNao, state.sensorNivel, (value) => { state.sensorNivel = value; state.aeracao = ""; state.taxa = ""; state.escada = ""; state.extras = []; rerender(); }));
       if (state.sensorNivel) wrap.appendChild(renderStep("Aeração", siloPulmaoConfig.simNao, state.aeracao, (value) => { state.aeracao = value; state.taxa = ""; state.escada = ""; state.extras = []; rerender(); }));
       if (state.aeracao === "sim") wrap.appendChild(renderStep("Taxa de Aeração", siloPulmaoConfig.taxas, state.taxa, (value) => { state.taxa = value; rerender(); }));
-      if (state.aeracao === "nao" || state.taxa) wrap.appendChild(renderStep("Tipo de Escada", siloPulmaoConfig.escadas, state.escada, (value) => { state.escada = value; state.extras = []; rerender(); }));
+      if (state.aeracao === "nao" || state.taxa) wrap.appendChild(renderStep("Tipo de Escada", siloPulmaoConfig.escadas, state.escada, (value) => { state.escada = value; state.alternarEscadas = ""; state.extras = []; rerender(); }));
+      if (Number(quantidadeInput ? quantidadeInput.value : 1) <= 1) {
+        state.alternarEscadas = "";
+      }
+      if (state.escada && Number(quantidadeInput ? quantidadeInput.value : 1) > 1) {
+        wrap.appendChild(renderStep("Alternar escadas caracol e marinheiro?", siloPulmaoConfig.simNao, state.alternarEscadas, (value) => { state.alternarEscadas = value; rerender(); }));
+      }
       if (state.escada) renderExtraCards(wrap);
       optionsBox.appendChild(wrap);
     }
@@ -1462,6 +1471,14 @@
       });
     });
   });
+
+  if (quantidadeInput) {
+    quantidadeInput.addEventListener("input", () => {
+      if (isSiloPulmaoSelected()) {
+        loadOptions(finalInput.value).catch(() => {});
+      }
+    });
+  }
 
   form.addEventListener("submit", (event) => {
     if (!finalInput.value) {

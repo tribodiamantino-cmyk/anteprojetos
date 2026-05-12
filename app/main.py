@@ -369,6 +369,8 @@ def resumo_silo_pulmao(campos):
         partes.append(f"Aeração {campos.get('aeracao_taxa')}")
     if campos.get("escada_rotulo"):
         partes.append(f"Escada {campos.get('escada_rotulo')}")
+    if campos.get("alternar_escadas") == "sim":
+        partes.append("Alternar escadas caracol e marinheiro")
     for extra in campos.get("escada_extras") or []:
         if extra.get("rotulo"):
             partes.append(extra["rotulo"])
@@ -423,6 +425,7 @@ def collect_silo_pulmao_campos(form):
         "aeracao_taxa": (form.get("silo_aeracao_taxa") or "").strip() if aeracao == "sim" else "",
         "escada": escada,
         "escada_rotulo": SILO_ESCADAS.get(escada, ""),
+        "alternar_escadas": (form.get("silo_alternar_escadas") or "nao").strip(),
         "escada_extras": extras,
     }
 
