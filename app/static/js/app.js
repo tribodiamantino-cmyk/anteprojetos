@@ -231,8 +231,29 @@
   const pathBox = document.getElementById("equipamento-caminho-selecionado");
   const attrsBox = document.getElementById("equipamento-atributos-carregados");
   const optionsBox = document.getElementById("equipamento-opcoes-carregadas");
+  const variationLabels = Array.from(form.querySelectorAll("[data-variation-level]"));
   const selectedChain = window.ITEM_EDITANDO_CADEIA || [];
   const selectedOptions = window.ITEM_EDITANDO_OPCOES || {};
+
+  function selectedCadastroNome() {
+    const option = selects[0].selectedOptions[0];
+    return option ? option.dataset.cadastroNome || option.textContent : "";
+  }
+
+  function isFluxoSelected() {
+    return selectedCadastroNome() === "Item 1 - Fluxo" || selectedPath()[0] === "Fluxo";
+  }
+
+  function setVariationFieldsVisible(visible) {
+    variationLabels.forEach((label) => {
+      label.hidden = !visible;
+    });
+    if (!visible) {
+      for (let index = 1; index < selects.length; index += 1) {
+        resetSelect(selects[index], selects[index].dataset.placeholder || "Selecione");
+      }
+    }
+  }
 
   function resetSelect(select, placeholder) {
     select.innerHTML = "";
@@ -317,7 +338,7 @@
     }
 
     const title = document.createElement("h3");
-    title.textContent = "Configuracoes do item";
+    title.textContent = isFluxoSelected() ? "Fluxo" : "Configuracoes do item";
     optionsBox.appendChild(title);
 
     const grid = document.createElement("div");
@@ -338,7 +359,21 @@
       label.textContent = option.nome;
       label.appendChild(hidden);
 
-      if (option.tipo === "booleano") {
+      if (option.tipo === "booleano" && option.chave === "fluxo_impurezas_habilitado") {
+        const select = document.createElement("select");
+        select.name = `opcao__${option.id}`;
+        const no = document.createElement("option");
+        no.value = "nao";
+        no.textContent = "Não";
+        no.selected = saved.valor !== "sim";
+        const yes = document.createElement("option");
+        yes.value = "sim";
+        yes.textContent = "Sim";
+        yes.selected = saved.valor === "sim";
+        select.appendChild(no);
+        select.appendChild(yes);
+        label.appendChild(select);
+      } else if (option.tipo === "booleano") {
         label.className = "option-check";
         label.textContent = "";
         label.appendChild(hidden);
@@ -448,6 +483,7 @@
     optionsBox.innerHTML = "";
 
     if (!selectedId) {
+      setVariationFieldsVisible(true);
       for (let index = level + 1; index < selects.length; index += 1) {
         resetSelect(selects[index], selects[index].dataset.placeholder || "Selecione");
       }
@@ -455,6 +491,16 @@
       return;
     }
 
+    if (level === 0 && isFluxoSelected()) {
+      setVariationFieldsVisible(false);
+      finalInput.value = selectedId;
+      pathBox.textContent = "Fluxo";
+      attrsBox.innerHTML = "";
+      await loadOptions(selectedId);
+      return;
+    }
+
+    setVariationFieldsVisible(true);
     const children = await loadChildren(level, selectedId);
     if (!children.length || level === selects.length - 1) {
       finalInput.value = selectedId;
@@ -482,6 +528,14 @@
   async function preloadSelection() {
     if (!selectedChain.length) return;
     selects[0].value = selectedChain[0].id;
+    if (isFluxoSelected()) {
+      setVariationFieldsVisible(false);
+      finalInput.value = selectedChain[0].id;
+      pathBox.textContent = "Fluxo";
+      attrsBox.innerHTML = "";
+      await loadOptions(finalInput.value);
+      return;
+    }
     if (selectedChain[1]) {
       await loadChildren(0, selectedChain[0].id, selectedChain[1].id);
     }

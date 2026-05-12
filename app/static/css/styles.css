@@ -698,6 +698,12 @@ legend {
   line-height: 1.45;
 }
 
+.item-summary-line {
+  color: #344054;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
 .item-list {
   display: grid;
   gap: 10px;

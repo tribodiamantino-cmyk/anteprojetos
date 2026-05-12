@@ -197,7 +197,26 @@ def parse_item(row):
     item = dict(row)
     item["campos"] = json.loads(item["campos_json"] or "{}")
     item["opcoes"] = []
+    item["resumo_fluxo"] = ""
     return item
+
+
+def equipamento_nome_exibicao(nome):
+    return "Fluxo" if nome == "Item 1 - Fluxo" else nome
+
+
+def resumo_fluxo(opcoes):
+    dados = {opcao["opcao_chave"]: opcao for opcao in opcoes}
+    tipo = dados.get("tipo_fluxo", {}).get("valor_rotulo") or "-"
+    graos = dados.get("fluxo_graos", {}).get("valor_rotulo") or "-"
+    impurezas_habilitado = dados.get("fluxo_impurezas_habilitado", {}).get("valor") == "sim"
+    moega = dados.get("moega", {}).get("valor_rotulo") or "-"
+    if impurezas_habilitado:
+        impurezas_valor = dados.get("fluxo_impurezas", {}).get("valor_rotulo") or "-"
+        impurezas = f"Sim - {impurezas_valor}"
+    else:
+        impurezas = "Não"
+    return f"Fluxo | Tipo: {tipo} | Grãos: {graos} | Impurezas: {impurezas} | Moega: {moega}"
 
 
 def carregar_opcoes_itens(conn, itens):
@@ -211,6 +230,9 @@ def carregar_opcoes_itens(conn, itens):
             (item["id"],),
         ).fetchall()
         item["opcoes"] = [dict(opcao) for opcao in opcoes]
+        if item["equipamento_nome"] in ("Fluxo", "Item 1 - Fluxo"):
+            item["equipamento_nome"] = "Fluxo"
+            item["resumo_fluxo"] = resumo_fluxo(item["opcoes"])
     return itens
 
 
@@ -1339,7 +1361,10 @@ def editar_anteprojeto(
         anteprojeto = get_anteprojeto_or_404(conn, anteprojeto_id)
         produtos_pai = conn.execute(
             """
-            SELECT id, nome
+            SELECT
+                id,
+                CASE WHEN nome = 'Item 1 - Fluxo' THEN 'Fluxo' ELSE nome END AS nome,
+                nome AS cadastro_nome
             FROM equipamentos_modelo
             WHERE parent_id IS NULL AND ativo = 1
             ORDER BY nome, id
@@ -1476,7 +1501,7 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
 
         schema = json.loads(equipamento["schema_json"])
-        caminho_equipamento = obter_caminho_equipamento(conn, equipamento_id)
+        caminho_equipamento = equipamento_nome_exibicao(obter_caminho_equipamento(conn, equipamento_id))
         quantidade = int(form.get("quantidade") or 1)
         tipo_definicao = form.get("tipo_definicao") or "Engenharia dimensionar"
         situacao = form.get("situacao") or "Novo"
