@@ -199,6 +199,7 @@ def parse_item(row):
     item["opcoes"] = []
     item["resumo_fluxo"] = ""
     item["resumo_transportador"] = ""
+    item["resumo_maquina_limpeza"] = ""
     return item
 
 
@@ -207,6 +208,8 @@ def equipamento_nome_exibicao(nome):
         return "Fluxo"
     if nome == "Item 2 - Transportadores":
         return "Transportador"
+    if nome == "Item 3 - Máquina de Limpeza Grain Cleaner EC":
+        return "Máquina de Limpeza Grain Cleaner EC"
     return nome
 
 
@@ -245,6 +248,39 @@ def resumo_transportador(campos):
     if acessorios:
         partes.append(f"Acessórios: {', '.join(acessorios)}")
     return " | ".join(partes)
+
+
+def resumo_maquina_limpeza(campos):
+    tipo = campos.get("tipo_limpeza_rotulo") or "-"
+    modelo = campos.get("modelo_rotulo") or "-"
+    return f"Máquina de Limpeza Grain Cleaner EC | {tipo} | {modelo}"
+
+
+MAQUINA_LIMPEZA_TIPOS = {
+    "pre_limpeza": "Pré-Limpeza",
+    "pos_limpeza": "Pós-Limpeza",
+}
+MAQUINA_LIMPEZA_MODELOS = {
+    "mle_45_60": "MLE 45 - 60 t/h",
+    "mle_95_120": "MLE 95 - 120 t/h",
+    "mle_145_180": "MLE 145 - 180 t/h",
+    "mle_190_240": "MLE 190 - 240 t/h",
+    "mle_45_47": "MLE 45 - 47 t/h",
+    "mle_95_96": "MLE 95 - 96 t/h",
+    "mle_145_144": "MLE 145 - 144 t/h",
+    "mle_190_192": "MLE 190 - 192 t/h",
+}
+
+
+def collect_maquina_limpeza_campos(form):
+    tipo = (form.get("maquina_limpeza_tipo") or "").strip()
+    modelo = (form.get("maquina_limpeza_modelo") or "").strip()
+    return {
+        "tipo_limpeza": tipo,
+        "tipo_limpeza_rotulo": MAQUINA_LIMPEZA_TIPOS.get(tipo, tipo),
+        "modelo": modelo,
+        "modelo_rotulo": MAQUINA_LIMPEZA_MODELOS.get(modelo, modelo),
+    }
 
 
 TRANSPORTADOR_TIPOS = {
@@ -317,6 +353,12 @@ def carregar_opcoes_itens(conn, itens):
         elif item["equipamento_nome"] in ("Transportador", "Item 2 - Transportadores"):
             item["equipamento_nome"] = "Transportador"
             item["resumo_transportador"] = resumo_transportador(item["campos"])
+        elif item["equipamento_nome"] in (
+            "Máquina de Limpeza Grain Cleaner EC",
+            "Item 3 - Máquina de Limpeza Grain Cleaner EC",
+        ):
+            item["equipamento_nome"] = "Máquina de Limpeza Grain Cleaner EC"
+            item["resumo_maquina_limpeza"] = resumo_maquina_limpeza(item["campos"])
     return itens
 
 
@@ -1450,6 +1492,7 @@ def editar_anteprojeto(
                 CASE
                     WHEN nome = 'Item 1 - Fluxo' THEN 'Fluxo'
                     WHEN nome = 'Item 2 - Transportadores' THEN 'Transportadores'
+                    WHEN nome = 'Item 3 - Máquina de Limpeza Grain Cleaner EC' THEN 'Máquina de Limpeza Grain Cleaner EC'
                     ELSE nome
                 END AS nome,
                 nome AS cadastro_nome
@@ -1599,6 +1642,8 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             situacao = "Novo"
         if equipamento["nome"] == "Item 2 - Transportadores":
             campos = collect_transportador_campos(form)
+        elif equipamento["nome"] == "Item 3 - Máquina de Limpeza Grain Cleaner EC":
+            campos = collect_maquina_limpeza_campos(form)
         else:
             campos = collect_campos(form, schema)
         campos_json = json.dumps(campos, ensure_ascii=False)

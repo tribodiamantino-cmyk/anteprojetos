@@ -273,6 +273,27 @@
     },
   };
 
+  const maquinaLimpezaConfig = {
+    tipos: [
+      { value: "pre_limpeza", label: "Pré-Limpeza" },
+      { value: "pos_limpeza", label: "Pós-Limpeza" },
+    ],
+    modelos: {
+      pre_limpeza: [
+        { value: "mle_45_60", label: "MLE 45 - 60 t/h" },
+        { value: "mle_95_120", label: "MLE 95 - 120 t/h" },
+        { value: "mle_145_180", label: "MLE 145 - 180 t/h" },
+        { value: "mle_190_240", label: "MLE 190 - 240 t/h" },
+      ],
+      pos_limpeza: [
+        { value: "mle_45_47", label: "MLE 45 - 47 t/h" },
+        { value: "mle_95_96", label: "MLE 95 - 96 t/h" },
+        { value: "mle_145_144", label: "MLE 145 - 144 t/h" },
+        { value: "mle_190_192", label: "MLE 190 - 192 t/h" },
+      ],
+    },
+  };
+
   function selectedCadastroNome() {
     const option = selects[0].selectedOptions[0];
     return option ? option.dataset.cadastroNome || option.textContent : "";
@@ -284,6 +305,13 @@
 
   function isTransportadorSelected() {
     return selectedCadastroNome() === "Item 2 - Transportadores" || selectedPath()[0] === "Transportadores";
+  }
+
+  function isMaquinaLimpezaSelected() {
+    return (
+      selectedCadastroNome() === "Item 3 - Máquina de Limpeza Grain Cleaner EC" ||
+      selectedPath()[0] === "Máquina de Limpeza Grain Cleaner EC"
+    );
   }
 
   function setVariationFieldsVisible(visible) {
@@ -768,6 +796,69 @@
     rerender();
   }
 
+  function renderMaquinaLimpezaOptions() {
+    const state = {
+      tipo: selectedCampos.tipo_limpeza || "",
+      modelo: selectedCampos.modelo || "",
+    };
+
+    function isComplete() {
+      return Boolean(state.tipo && state.modelo);
+    }
+
+    function renderHiddenFields(container) {
+      container.appendChild(hiddenInput("maquina_limpeza_tipo", state.tipo));
+      container.appendChild(hiddenInput("maquina_limpeza_modelo", state.modelo));
+    }
+
+    function renderStep(titleText, choices, currentValue, onChange) {
+      const step = document.createElement("section");
+      step.className = "fluxo-step";
+      const title = document.createElement("h4");
+      title.textContent = titleText;
+      step.appendChild(title);
+      const grid = document.createElement("div");
+      grid.className = "choice-card-grid";
+      choices.forEach((choice) => {
+        grid.appendChild(makeFluxoCard(choice.label, choice.value, currentValue === choice.value, () => onChange(choice.value)));
+      });
+      step.appendChild(grid);
+      return step;
+    }
+
+    function rerender() {
+      optionsBox.innerHTML = "";
+      setFinalFieldsVisible(isComplete());
+      const wrap = document.createElement("div");
+      wrap.className = "fluxo-wizard";
+      const title = document.createElement("h3");
+      title.textContent = "Máquina de Limpeza Grain Cleaner EC";
+      wrap.appendChild(title);
+      renderHiddenFields(wrap);
+
+      wrap.appendChild(
+        renderStep("Etapa 1 - Tipo de Limpeza", maquinaLimpezaConfig.tipos, state.tipo, (value) => {
+          state.tipo = value;
+          state.modelo = "";
+          rerender();
+        })
+      );
+
+      if (state.tipo) {
+        wrap.appendChild(
+          renderStep("Etapa 2 - Modelo", maquinaLimpezaConfig.modelos[state.tipo] || [], state.modelo, (value) => {
+            state.modelo = value;
+            rerender();
+          })
+        );
+      }
+
+      optionsBox.appendChild(wrap);
+    }
+
+    rerender();
+  }
+
   function renderOptions(options) {
     optionsBox.innerHTML = "";
     if (isFluxoSelected()) {
@@ -776,6 +867,10 @@
     }
     if (isTransportadorSelected()) {
       renderTransportadorOptions();
+      return;
+    }
+    if (isMaquinaLimpezaSelected()) {
+      renderMaquinaLimpezaOptions();
       return;
     }
     if (!options.length) {
@@ -958,6 +1053,16 @@
       return;
     }
 
+    if (level === 0 && isMaquinaLimpezaSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedId;
+      pathBox.textContent = "Máquina de Limpeza Grain Cleaner EC";
+      attrsBox.innerHTML = "";
+      await loadOptions(selectedId);
+      return;
+    }
+
     setVariationFieldsVisible(true);
     setFinalFieldsVisible(true);
     const children = await loadChildren(level, selectedId);
@@ -983,7 +1088,10 @@
       attrsBox.innerHTML = '<p class="muted">Selecione o modelo final antes de adicionar ao anteprojeto.</p>';
       return;
     }
-    if ((isFluxoSelected() || isTransportadorSelected()) && finalFields.some((element) => element.hidden)) {
+    if (
+      (isFluxoSelected() || isTransportadorSelected() || isMaquinaLimpezaSelected()) &&
+      finalFields.some((element) => element.hidden)
+    ) {
       event.preventDefault();
       attrsBox.innerHTML = "";
       const alert = document.createElement("p");
@@ -1010,6 +1118,15 @@
       setFinalFieldsVisible(false);
       finalInput.value = selectedChain[0].id;
       pathBox.textContent = "Transportadores";
+      attrsBox.innerHTML = "";
+      await loadOptions(finalInput.value);
+      return;
+    }
+    if (isMaquinaLimpezaSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedChain[0].id;
+      pathBox.textContent = "Máquina de Limpeza Grain Cleaner EC";
       attrsBox.innerHTML = "";
       await loadOptions(finalInput.value);
       return;
