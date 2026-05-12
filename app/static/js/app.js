@@ -369,6 +369,71 @@
     },
   };
 
+  const siloFundoPlanoConfig = {
+    silos: [
+      { d: 18, a: 6, ton: 132, sacas: 2206 }, { d: 18, a: 7, ton: 153, sacas: 2549 }, { d: 18, a: 8, ton: 174, sacas: 2892 },
+      { d: 18, a: 9, ton: 194, sacas: 3235 }, { d: 18, a: 10, ton: 215, sacas: 3578 }, { d: 18, a: 11, ton: 235, sacas: 3921 },
+      { d: 18, a: 12, ton: 256, sacas: 4264 }, { d: 21, a: 6, ton: 182, sacas: 3036 }, { d: 21, a: 7, ton: 210, sacas: 3503 },
+      { d: 21, a: 8, ton: 238, sacas: 3970 }, { d: 21, a: 9, ton: 266, sacas: 4437 }, { d: 21, a: 10, ton: 294, sacas: 4903 },
+      { d: 21, a: 11, ton: 322, sacas: 5370 }, { d: 21, a: 12, ton: 350, sacas: 5837 }, { d: 24, a: 6, ton: 241, sacas: 4010 },
+      { d: 24, a: 7, ton: 277, sacas: 4619 }, { d: 24, a: 8, ton: 314, sacas: 5229 }, { d: 24, a: 9, ton: 350, sacas: 5839 },
+      { d: 24, a: 10, ton: 387, sacas: 6448 }, { d: 24, a: 11, ton: 423, sacas: 7058 }, { d: 24, a: 12, ton: 460, sacas: 7668 },
+      { d: 30, a: 6, ton: 384, sacas: 6403 }, { d: 30, a: 7, ton: 441, sacas: 7355 }, { d: 30, a: 8, ton: 498, sacas: 8308 },
+      { d: 30, a: 9, ton: 556, sacas: 9261 }, { d: 30, a: 10, ton: 613, sacas: 10213 }, { d: 30, a: 11, ton: 670, sacas: 11166 },
+      { d: 30, a: 12, ton: 727, sacas: 12118 }, { d: 30, a: 13, ton: 784, sacas: 13071 }, { d: 30, a: 14, ton: 841, sacas: 14023 },
+      { d: 30, a: 15, ton: 899, sacas: 14976 }, { d: 30, a: 16, ton: 956, sacas: 15929 }, { d: 36, a: 6, ton: 565, sacas: 9418 },
+      { d: 36, a: 7, ton: 647, sacas: 10790 }, { d: 36, a: 8, ton: 730, sacas: 12161 }, { d: 36, a: 9, ton: 812, sacas: 13533 },
+      { d: 36, a: 10, ton: 894, sacas: 14905 }, { d: 36, a: 11, ton: 977, sacas: 16277 }, { d: 36, a: 12, ton: 1059, sacas: 17648 },
+      { d: 36, a: 13, ton: 1141, sacas: 19020 }, { d: 36, a: 14, ton: 1224, sacas: 20392 }, { d: 36, a: 15, ton: 1306, sacas: 21763 },
+      { d: 36, a: 16, ton: 1388, sacas: 23135 }, { d: 42, a: 8, ton: 1009, sacas: 16823 }, { d: 42, a: 9, ton: 1121, sacas: 18690 },
+      { d: 42, a: 10, ton: 1233, sacas: 20557 }, { d: 42, a: 11, ton: 1345, sacas: 22424 }, { d: 42, a: 12, ton: 1457, sacas: 24291 },
+      { d: 42, a: 13, ton: 1569, sacas: 26158 }, { d: 42, a: 14, ton: 1681, sacas: 28025 }, { d: 42, a: 15, ton: 1794, sacas: 29892 },
+      { d: 42, a: 16, ton: 1906, sacas: 31759 }, { d: 42, a: 17, ton: 2018, sacas: 33626 }, { d: 42, a: 18, ton: 2130, sacas: 35493 },
+      { d: 42, a: 19, ton: 2242, sacas: 37360 }, { d: 48, a: 8, ton: 1339, sacas: 22324 }, { d: 48, a: 9, ton: 1486, sacas: 24763 },
+      { d: 48, a: 10, ton: 1632, sacas: 27201 }, { d: 48, a: 11, ton: 1778, sacas: 29640 }, { d: 48, a: 12, ton: 1925, sacas: 32079 },
+      { d: 48, a: 13, ton: 2071, sacas: 34517 }, { d: 48, a: 14, ton: 2217, sacas: 36956 }, { d: 48, a: 15, ton: 2364, sacas: 39394 },
+      { d: 48, a: 16, ton: 2510, sacas: 41833 }, { d: 48, a: 17, ton: 2656, sacas: 44272 }, { d: 48, a: 18, ton: 2803, sacas: 46710 },
+      { d: 48, a: 19, ton: 2949, sacas: 49149 }, { d: 54, a: 8, ton: 1722, sacas: 28700 }, { d: 54, a: 9, ton: 1907, sacas: 31786 },
+      { d: 54, a: 10, ton: 2092, sacas: 34872 }, { d: 54, a: 11, ton: 2278, sacas: 37959 }, { d: 54, a: 12, ton: 2463, sacas: 41045 },
+      { d: 54, a: 13, ton: 2648, sacas: 44131 }, { d: 54, a: 14, ton: 2833, sacas: 47218 }, { d: 54, a: 15, ton: 3018, sacas: 50304 },
+      { d: 54, a: 16, ton: 3203, sacas: 53390 }, { d: 54, a: 17, ton: 3389, sacas: 56477 }, { d: 54, a: 18, ton: 3574, sacas: 59563 },
+      { d: 54, a: 19, ton: 3759, sacas: 62649 }, { d: 60, a: 8, ton: 2159, sacas: 35981 }, { d: 60, a: 9, ton: 2388, sacas: 39792 },
+      { d: 60, a: 10, ton: 2616, sacas: 43602 }, { d: 60, a: 11, ton: 2845, sacas: 47412 }, { d: 60, a: 12, ton: 3073, sacas: 51223 },
+      { d: 60, a: 13, ton: 3302, sacas: 55033 }, { d: 60, a: 14, ton: 3531, sacas: 58843 }, { d: 60, a: 15, ton: 3759, sacas: 62654 },
+      { d: 60, a: 16, ton: 3988, sacas: 66464 }, { d: 60, a: 17, ton: 4216, sacas: 70274 }, { d: 60, a: 18, ton: 4445, sacas: 74084 },
+      { d: 60, a: 19, ton: 4674, sacas: 77895 }, { d: 60, a: 20, ton: 4902, sacas: 81705 }, { d: 72, a: 10, ton: 3862, sacas: 64371 },
+      { d: 72, a: 11, ton: 4191, sacas: 69857 }, { d: 72, a: 12, ton: 4521, sacas: 75344 }, { d: 72, a: 13, ton: 4850, sacas: 80831 },
+      { d: 72, a: 14, ton: 5179, sacas: 86318 }, { d: 72, a: 15, ton: 5508, sacas: 91805 }, { d: 72, a: 16, ton: 5837, sacas: 97292 },
+      { d: 72, a: 17, ton: 6167, sacas: 102778 }, { d: 72, a: 18, ton: 6496, sacas: 108265 }, { d: 72, a: 19, ton: 6825, sacas: 113752 },
+      { d: 72, a: 20, ton: 7154, sacas: 119239 }, { d: 72, a: 21, ton: 7484, sacas: 124726 }, { d: 72, a: 22, ton: 7813, sacas: 130213 },
+      { d: 72, a: 23, ton: 8142, sacas: 135699 }, { d: 72, a: 24, ton: 8471, sacas: 141186 }, { d: 72, a: 25, ton: 8800, sacas: 146673 },
+      { d: 90, a: 12, ton: 7286, sacas: 121437 }, { d: 90, a: 13, ton: 7801, sacas: 130011 }, { d: 90, a: 14, ton: 8315, sacas: 138584 },
+      { d: 90, a: 15, ton: 8829, sacas: 147157 }, { d: 90, a: 16, ton: 9344, sacas: 155730 }, { d: 90, a: 17, ton: 9858, sacas: 164303 },
+      { d: 90, a: 18, ton: 10373, sacas: 172876 }, { d: 90, a: 19, ton: 10887, sacas: 181450 }, { d: 90, a: 20, ton: 11401, sacas: 190023 },
+      { d: 90, a: 21, ton: 11916, sacas: 198596 }, { d: 90, a: 22, ton: 12430, sacas: 207169 }, { d: 90, a: 23, ton: 12945, sacas: 215742 },
+      { d: 90, a: 24, ton: 13459, sacas: 224315 }, { d: 90, a: 25, ton: 13973, sacas: 232889 }, { d: 105, a: 12, ton: 10170, sacas: 169500 },
+      { d: 105, a: 13, ton: 10870, sacas: 181169 }, { d: 105, a: 14, ton: 11570, sacas: 192838 }, { d: 105, a: 15, ton: 12270, sacas: 204507 },
+      { d: 105, a: 16, ton: 12971, sacas: 216176 }, { d: 105, a: 17, ton: 13671, sacas: 227845 }, { d: 105, a: 18, ton: 14371, sacas: 239514 },
+      { d: 105, a: 19, ton: 15071, sacas: 251183 }, { d: 105, a: 20, ton: 15771, sacas: 262852 }, { d: 105, a: 21, ton: 16471, sacas: 274521 },
+      { d: 105, a: 22, ton: 17171, sacas: 286190 }, { d: 105, a: 23, ton: 17872, sacas: 297859 }, { d: 105, a: 24, ton: 18572, sacas: 309528 },
+      { d: 105, a: 25, ton: 19272, sacas: 321197 },
+    ],
+    diametros: [18, 21, 24, 30, 36, 42, 48, 54, 60, 72, 90, 105],
+    termometrias: siloPulmaoConfig.termometrias,
+    pacotes: siloPulmaoConfig.pacotes,
+    simNao: siloPulmaoConfig.simNao,
+    taxas: siloPulmaoConfig.taxas,
+    escadas: siloPulmaoConfig.escadas,
+    extras: siloPulmaoConfig.extras,
+    roscas: [
+      { value: "nao", label: "NÃ£o" },
+      { value: "standard", label: "Standard" },
+      { value: "modulo_avanco", label: "Com mÃ³dulo de avanÃ§o" },
+      { value: "painel_automatico", label: "Com painel automÃ¡tico" },
+      { value: "automatica_zero_entrada", label: "AutomÃ¡tica zero entrada" },
+    ],
+  };
+
   function selectedCadastroNome() {
     const option = selects[0].selectedOptions[0];
     return option ? option.dataset.cadastroNome || option.textContent : "";
@@ -395,6 +460,10 @@
 
   function isSiloPulmaoSelected() {
     return selectedCadastroNome() === "Item 5 - Silo Pulmão Elevado" || selectedPath()[0] === "Silo Pulmão Elevado";
+  }
+
+  function isSiloFundoPlanoSelected() {
+    return selectedCadastroNome() === "Item 6 - Silo Fundo Plano" || selectedPath()[0] === "Silo Fundo Plano";
   }
 
   function setVariationFieldsVisible(visible) {
@@ -1277,6 +1346,232 @@
     rerender();
   }
 
+  function renderSiloFundoPlanoOptions() {
+    const state = {
+      modo: selectedCampos.modo || "",
+      diametro: selectedCampos.diametro || "",
+      capacidadeTipo: selectedCampos.capacidade_tipo || "",
+      capacidadeDesejada: selectedCampos.capacidade_desejada || "",
+      silo: selectedCampos.diametro ? { d: Number(selectedCampos.diametro), a: Number(selectedCampos.aneis), ton: Number(selectedCampos.ton), sacas: Number(String(selectedCampos.sacas || "").replace(/\D/g, "")) } : null,
+      termometria: selectedCampos.termometria || "",
+      pacote: selectedCampos.termometria_pacote || "",
+      sensorNivel: selectedCampos.sensor_nivel || "",
+      aeracao: selectedCampos.aeracao || "",
+      taxa: selectedCampos.aeracao_taxa || "",
+      escada: selectedCampos.escada || "",
+      extras: (selectedCampos.escada_extras || []).map((item) => item.chave).filter(Boolean),
+      rosca: selectedCampos.rosca_varredora || "",
+      espalhador: selectedCampos.espalhador_graos || "",
+    };
+
+    if (quantidadeInput) {
+      quantidadeInput.oninput = () => {
+        if (isSiloFundoPlanoSelected()) {
+          rerender();
+        }
+      };
+    }
+
+    const fmt = (value) => Number(value || 0).toLocaleString("pt-BR");
+    const resetAccessories = () => {
+      state.termometria = "";
+      state.pacote = "";
+      state.sensorNivel = "";
+      state.aeracao = "";
+      state.taxa = "";
+      state.escada = "";
+      state.extras = [];
+      state.rosca = "";
+      state.espalhador = "";
+    };
+    const resetAfterTermometria = () => {
+      state.pacote = "";
+      state.sensorNivel = "";
+      state.aeracao = "";
+      state.taxa = "";
+      state.escada = "";
+      state.extras = [];
+      state.rosca = "";
+      state.espalhador = "";
+    };
+    const resetAfterSensor = () => {
+      state.aeracao = "";
+      state.taxa = "";
+      state.escada = "";
+      state.extras = [];
+      state.rosca = "";
+      state.espalhador = "";
+    };
+    const resetAfterAeracao = () => {
+      state.taxa = "";
+      state.escada = "";
+      state.extras = [];
+      state.rosca = "";
+      state.espalhador = "";
+    };
+    const complete = () => Boolean(
+      state.silo &&
+      state.termometria &&
+      (state.termometria === "sem" || state.pacote) &&
+      state.sensorNivel &&
+      state.aeracao &&
+      (state.aeracao === "nao" || state.taxa) &&
+      state.escada &&
+      state.rosca &&
+      state.espalhador
+    );
+
+    function renderHiddenFields(container) {
+      container.appendChild(hiddenInput("silo_modo", state.modo));
+      container.appendChild(hiddenInput("silo_diametro", state.silo ? String(state.silo.d) : ""));
+      container.appendChild(hiddenInput("silo_aneis", state.silo ? String(state.silo.a) : ""));
+      container.appendChild(hiddenInput("silo_ton", state.silo ? String(state.silo.ton) : ""));
+      container.appendChild(hiddenInput("silo_sacas", state.silo ? fmt(state.silo.sacas) : ""));
+      container.appendChild(hiddenInput("silo_capacidade_tipo", state.capacidadeTipo));
+      container.appendChild(hiddenInput("silo_capacidade_desejada", state.capacidadeDesejada));
+      container.appendChild(hiddenInput("silo_termometria", state.termometria));
+      container.appendChild(hiddenInput("silo_termometria_pacote", state.pacote));
+      container.appendChild(hiddenInput("silo_sensor_nivel", state.sensorNivel));
+      container.appendChild(hiddenInput("silo_aeracao", state.aeracao));
+      container.appendChild(hiddenInput("silo_aeracao_taxa", state.taxa));
+      container.appendChild(hiddenInput("silo_escada", state.escada));
+      state.extras.forEach((extra) => container.appendChild(hiddenInput("silo_escada_extra", extra)));
+      container.appendChild(hiddenInput("silo_fp_rosca_varredora", state.rosca));
+      container.appendChild(hiddenInput("silo_fp_espalhador_graos", state.espalhador));
+    }
+
+    function renderStep(titleText, choices, currentValue, onChange) {
+      const step = document.createElement("section");
+      step.className = "fluxo-step";
+      const title = document.createElement("h4");
+      title.textContent = titleText;
+      step.appendChild(title);
+      const grid = document.createElement("div");
+      grid.className = "choice-card-grid";
+      choices.forEach((choice) => grid.appendChild(makeFluxoCard(choice.label, choice.value, currentValue === choice.value, () => onChange(choice.value))));
+      step.appendChild(grid);
+      return step;
+    }
+
+    function siloChoiceCard(silo) {
+      const selected = state.silo && state.silo.d === silo.d && state.silo.a === silo.a;
+      const button = makeFluxoCard("", `${silo.d}_${silo.a}`, selected, () => {
+        state.silo = silo;
+        state.diametro = String(silo.d);
+        resetAccessories();
+        rerender();
+      });
+      button.classList.add("silo-card");
+      button.innerHTML = `<strong>${silo.d} ft | ${silo.a} anÃ©is</strong><span>${fmt(silo.ton)} Ton</span><span>${fmt(silo.sacas)} scs</span>`;
+      return button;
+    }
+
+    function renderSiloChoices(container) {
+      if (state.modo === "diametro" && state.diametro) {
+        const step = document.createElement("section");
+        step.className = "fluxo-step";
+        const title = document.createElement("h4");
+        title.textContent = "Etapa 3 - AnÃ©is";
+        step.appendChild(title);
+        const grid = document.createElement("div");
+        grid.className = "choice-card-grid";
+        siloFundoPlanoConfig.silos.filter((silo) => String(silo.d) === state.diametro).forEach((silo) => grid.appendChild(siloChoiceCard(silo)));
+        step.appendChild(grid);
+        container.appendChild(step);
+      }
+      if (state.modo === "capacidade" && state.capacidadeTipo) {
+        const step = document.createElement("section");
+        step.className = "fluxo-step";
+        const title = document.createElement("h4");
+        title.textContent = "Etapa 3 - Capacidade desejada";
+        step.appendChild(title);
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.placeholder = state.capacidadeTipo === "sacas" ? "Ex.: 20000" : "Ex.: 1200";
+        input.value = state.capacidadeDesejada;
+        step.appendChild(input);
+        const suggestionsBox = document.createElement("div");
+        suggestionsBox.className = "choice-card-grid";
+        step.appendChild(suggestionsBox);
+
+        function updateSuggestions() {
+          suggestionsBox.innerHTML = "";
+          const alvo = Number(String(state.capacidadeDesejada || "").replace(",", "."));
+          if (!alvo) return;
+          const key = state.capacidadeTipo === "sacas" ? "sacas" : "ton";
+          const menores = siloFundoPlanoConfig.silos.filter((silo) => silo[key] <= alvo).sort((a, b) => b[key] - a[key]).slice(0, 4).reverse();
+          const maiores = siloFundoPlanoConfig.silos.filter((silo) => silo[key] > alvo).sort((a, b) => a[key] - b[key]).slice(0, 4);
+          [...menores, ...maiores].forEach((silo) => suggestionsBox.appendChild(siloChoiceCard(silo)));
+        }
+        input.addEventListener("input", () => {
+          state.capacidadeDesejada = input.value;
+          state.silo = null;
+          resetAccessories();
+          updateSuggestions();
+        });
+        updateSuggestions();
+        container.appendChild(step);
+      }
+    }
+
+    function renderExtraCards(container) {
+      const extras = siloFundoPlanoConfig.extras[state.escada] || [];
+      if (!extras.length) return;
+      const step = document.createElement("section");
+      step.className = "fluxo-step";
+      const title = document.createElement("h4");
+      title.textContent = "Itens da escada";
+      step.appendChild(title);
+      const grid = document.createElement("div");
+      grid.className = "choice-card-grid";
+      extras.forEach((extra) => grid.appendChild(makeFluxoCard(extra.label, extra.value, state.extras.includes(extra.value), () => {
+        state.extras = state.extras.includes(extra.value) ? state.extras.filter((item) => item !== extra.value) : [...state.extras, extra.value];
+        rerender();
+      })));
+      step.appendChild(grid);
+      container.appendChild(step);
+    }
+
+    function rerender() {
+      optionsBox.innerHTML = "";
+      setFinalFieldsVisible(complete());
+      const wrap = document.createElement("div");
+      wrap.className = "fluxo-wizard";
+      const title = document.createElement("h3");
+      title.textContent = "Silo Fundo Plano";
+      wrap.appendChild(title);
+      renderHiddenFields(wrap);
+
+      wrap.appendChild(renderStep("Etapa 1 - Modo de SeleÃ§Ã£o", [{ value: "diametro", label: "Selecionar por DiÃ¢metro" }, { value: "capacidade", label: "Selecionar por Capacidade" }], state.modo, (value) => {
+        state.modo = value; state.diametro = ""; state.capacidadeTipo = ""; state.capacidadeDesejada = ""; state.silo = null; resetAccessories(); rerender();
+      }));
+      if (state.modo === "diametro") {
+        wrap.appendChild(renderStep("Etapa 2 - DiÃ¢metro (ft)", siloFundoPlanoConfig.diametros.map((d) => ({ value: String(d), label: String(d) })), state.diametro, (value) => {
+          state.diametro = value; state.silo = null; resetAccessories(); rerender();
+        }));
+      }
+      if (state.modo === "capacidade") {
+        wrap.appendChild(renderStep("Etapa 2 - Tipo de capacidade", [{ value: "ton", label: "Toneladas" }, { value: "sacas", label: "Sacas 60kg" }], state.capacidadeTipo, (value) => {
+          state.capacidadeTipo = value; state.capacidadeDesejada = ""; state.silo = null; resetAccessories(); rerender();
+        }));
+      }
+      renderSiloChoices(wrap);
+      if (state.silo) wrap.appendChild(renderStep("Termometria", siloFundoPlanoConfig.termometrias, state.termometria, (value) => { state.termometria = value; resetAfterTermometria(); rerender(); }));
+      if (state.termometria && state.termometria !== "sem") wrap.appendChild(renderStep("Pacote", siloFundoPlanoConfig.pacotes, state.pacote, (value) => { state.pacote = value; rerender(); }));
+      if (state.termometria === "sem" || state.pacote) wrap.appendChild(renderStep("Sensor de NÃ­vel", siloFundoPlanoConfig.simNao, state.sensorNivel, (value) => { state.sensorNivel = value; resetAfterSensor(); rerender(); }));
+      if (state.sensorNivel) wrap.appendChild(renderStep("AeraÃ§Ã£o", siloFundoPlanoConfig.simNao, state.aeracao, (value) => { state.aeracao = value; resetAfterAeracao(); rerender(); }));
+      if (state.aeracao === "sim") wrap.appendChild(renderStep("Taxa de AeraÃ§Ã£o", siloFundoPlanoConfig.taxas, state.taxa, (value) => { state.taxa = value; state.escada = ""; state.extras = []; state.rosca = ""; state.espalhador = ""; rerender(); }));
+      if (state.aeracao === "nao" || state.taxa) wrap.appendChild(renderStep("Tipo de Escada", siloFundoPlanoConfig.escadas, state.escada, (value) => { state.escada = value; state.extras = []; state.rosca = ""; state.espalhador = ""; rerender(); }));
+      if (state.escada) renderExtraCards(wrap);
+      if (state.escada) wrap.appendChild(renderStep("Rosca Varredora", siloFundoPlanoConfig.roscas, state.rosca, (value) => { state.rosca = value; state.espalhador = ""; rerender(); }));
+      if (state.rosca) wrap.appendChild(renderStep("Espalhador de grÃ£os", siloFundoPlanoConfig.simNao, state.espalhador, (value) => { state.espalhador = value; rerender(); }));
+      optionsBox.appendChild(wrap);
+    }
+
+    rerender();
+  }
+
   function renderOptions(options) {
     optionsBox.innerHTML = "";
     if (isFluxoSelected()) {
@@ -1297,6 +1592,10 @@
     }
     if (isSiloPulmaoSelected()) {
       renderSiloPulmaoOptions();
+      return;
+    }
+    if (isSiloFundoPlanoSelected()) {
+      renderSiloFundoPlanoOptions();
       return;
     }
     if (!options.length) {
@@ -1509,6 +1808,16 @@
       return;
     }
 
+    if (level === 0 && isSiloFundoPlanoSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedId;
+      pathBox.textContent = "Silo Fundo Plano";
+      attrsBox.innerHTML = "";
+      await loadOptions(selectedId);
+      return;
+    }
+
     setVariationFieldsVisible(true);
     setFinalFieldsVisible(true);
     const children = await loadChildren(level, selectedId);
@@ -1535,7 +1844,7 @@
       return;
     }
     if (
-      (isFluxoSelected() || isTransportadorSelected() || isMaquinaLimpezaSelected() || isSecadorSelected() || isSiloPulmaoSelected()) &&
+      (isFluxoSelected() || isTransportadorSelected() || isMaquinaLimpezaSelected() || isSecadorSelected() || isSiloPulmaoSelected() || isSiloFundoPlanoSelected()) &&
       finalFields.some((element) => element.hidden)
     ) {
       event.preventDefault();
@@ -1591,6 +1900,15 @@
       setFinalFieldsVisible(false);
       finalInput.value = selectedChain[0].id;
       pathBox.textContent = "Silo Pulmão Elevado";
+      attrsBox.innerHTML = "";
+      await loadOptions(finalInput.value);
+      return;
+    }
+    if (isSiloFundoPlanoSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedChain[0].id;
+      pathBox.textContent = "Silo Fundo Plano";
       attrsBox.innerHTML = "";
       await loadOptions(finalInput.value);
       return;

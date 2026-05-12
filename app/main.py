@@ -202,6 +202,7 @@ def parse_item(row):
     item["resumo_maquina_limpeza"] = ""
     item["resumo_secador"] = ""
     item["resumo_silo_pulmao"] = ""
+    item["resumo_silo_fundo_plano"] = ""
     return item
 
 
@@ -216,6 +217,8 @@ def equipamento_nome_exibicao(nome):
         return "Secador Process Dryer"
     if nome == "Item 5 - Silo Pulmão Elevado":
         return "Silo Pulmão Elevado"
+    if nome == "Item 6 - Silo Fundo Plano":
+        return "Silo Fundo Plano"
     return nome
 
 
@@ -430,6 +433,54 @@ def collect_silo_pulmao_campos(form):
     }
 
 
+ROSCA_VARREDORA = {
+    "nao": "Sem Rosca Varredora",
+    "standard": "Rosca Varredora Standard",
+    "modulo_avanco": "Rosca Varredora com módulo de avanço",
+    "painel_automatico": "Rosca Varredora com painel automático",
+    "automatica_zero_entrada": "Rosca Varredora automática zero entrada",
+}
+
+
+def resumo_silo_fundo_plano(campos):
+    partes = [
+        "Silo Fundo Plano",
+        f"{campos.get('diametro')} ft",
+        f"{campos.get('aneis')} anéis",
+        f"{campos.get('ton')} Ton",
+    ]
+    if campos.get("sacas"):
+        partes.append(f"{campos.get('sacas')} scs")
+    termometria = campos.get("termometria_rotulo")
+    if termometria and campos.get("termometria") != "sem":
+        partes.append(termometria)
+        if campos.get("termometria_pacote_rotulo"):
+            partes.append(campos["termometria_pacote_rotulo"])
+    if campos.get("sensor_nivel") == "sim":
+        partes.append("Sensor de Nível")
+    if campos.get("aeracao") == "sim":
+        partes.append(f"Aeração {campos.get('aeracao_taxa')}")
+    if campos.get("escada_rotulo"):
+        partes.append(f"Escada {campos.get('escada_rotulo')}")
+    for extra in campos.get("escada_extras") or []:
+        if extra.get("rotulo"):
+            partes.append(extra["rotulo"])
+    if campos.get("rosca_varredora") != "nao" and campos.get("rosca_varredora_rotulo"):
+        partes.append(campos["rosca_varredora_rotulo"])
+    if campos.get("espalhador_graos") == "sim":
+        partes.append("Espalhador de grãos")
+    return " | ".join(partes)
+
+
+def collect_silo_fundo_plano_campos(form):
+    campos = collect_silo_pulmao_campos(form)
+    rosca = (form.get("silo_fp_rosca_varredora") or "nao").strip()
+    campos["rosca_varredora"] = rosca
+    campos["rosca_varredora_rotulo"] = ROSCA_VARREDORA.get(rosca, "")
+    campos["espalhador_graos"] = (form.get("silo_fp_espalhador_graos") or "").strip()
+    return campos
+
+
 TRANSPORTADOR_TIPOS = {
     "redler": "Redler",
     "correia": "Correia",
@@ -512,6 +563,9 @@ def carregar_opcoes_itens(conn, itens):
         elif item["equipamento_nome"] in ("Silo Pulmão Elevado", "Item 5 - Silo Pulmão Elevado"):
             item["equipamento_nome"] = "Silo Pulmão Elevado"
             item["resumo_silo_pulmao"] = resumo_silo_pulmao(item["campos"])
+        elif item["equipamento_nome"] in ("Silo Fundo Plano", "Item 6 - Silo Fundo Plano"):
+            item["equipamento_nome"] = "Silo Fundo Plano"
+            item["resumo_silo_fundo_plano"] = resumo_silo_fundo_plano(item["campos"])
     return itens
 
 
@@ -1648,6 +1702,7 @@ def editar_anteprojeto(
                     WHEN nome = 'Item 3 - Máquina de Limpeza Grain Cleaner EC' THEN 'Máquina de Limpeza Grain Cleaner EC'
                     WHEN nome = 'Item 4 - Secadores Process Dryer' THEN 'Secadores Process Dryer'
                     WHEN nome = 'Item 5 - Silo Pulmão Elevado' THEN 'Silo Pulmão Elevado'
+                    WHEN nome = 'Item 6 - Silo Fundo Plano' THEN 'Silo Fundo Plano'
                     ELSE nome
                 END AS nome,
                 nome AS cadastro_nome
@@ -1803,6 +1858,8 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             campos = collect_secador_campos(form)
         elif equipamento["nome"] == "Item 5 - Silo Pulmão Elevado":
             campos = collect_silo_pulmao_campos(form)
+        elif equipamento["nome"] == "Item 6 - Silo Fundo Plano":
+            campos = collect_silo_fundo_plano_campos(form)
         else:
             campos = collect_campos(form, schema)
         campos_json = json.dumps(campos, ensure_ascii=False)
