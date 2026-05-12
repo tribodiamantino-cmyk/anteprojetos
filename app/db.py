@@ -451,13 +451,27 @@ def ensure_item1_fluxo(conn):
         ordem=2,
         obrigatorio=1,
     )
+    upsert_opcao_equipamento(
+        conn,
+        equipamento_id,
+        nome="Moega",
+        chave="moega",
+        tipo="selecao",
+        valores=[
+            ("simples", "Simples"),
+            ("dupla_poco_central", "Dupla (Poço Central)"),
+            ("paralela_tunel_inferior", "Paralela (Túnel Inferior)"),
+        ],
+        ordem=3,
+        obrigatorio=1,
+    )
     impurezas_id = upsert_opcao_equipamento(
         conn,
         equipamento_id,
         nome="Fluxo de Impurezas",
         chave="fluxo_impurezas_habilitado",
         tipo="booleano",
-        ordem=3,
+        ordem=4,
         obrigatorio=0,
     )
     capacidade_impurezas_id = upsert_opcao_equipamento(
@@ -467,7 +481,7 @@ def ensure_item1_fluxo(conn):
         chave="fluxo_impurezas",
         tipo="selecao",
         valores=[(capacidade, f"{capacidade} Ton/h") for capacidade in capacidades],
-        ordem=4,
+        ordem=5,
         obrigatorio=1,
     )
     conn.execute(
