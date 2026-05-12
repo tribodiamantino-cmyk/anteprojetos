@@ -1144,18 +1144,27 @@
         input.min = "0";
         input.placeholder = state.capacidadeTipo === "sacas" ? "Ex.: 20000" : "Ex.: 1200";
         input.value = state.capacidadeDesejada;
-        input.addEventListener("input", () => { state.capacidadeDesejada = input.value; state.silo = null; resetAccessories(); rerender(); });
         step.appendChild(input);
-        const alvo = Number(String(state.capacidadeDesejada || "").replace(",", "."));
-        if (alvo) {
+        const suggestionsBox = document.createElement("div");
+        suggestionsBox.className = "choice-card-grid";
+        step.appendChild(suggestionsBox);
+
+        function updateSuggestions() {
+          suggestionsBox.innerHTML = "";
+          const alvo = Number(String(state.capacidadeDesejada || "").replace(",", "."));
+          if (!alvo) return;
           const key = state.capacidadeTipo === "sacas" ? "sacas" : "ton";
           const menores = siloPulmaoConfig.silos.filter((silo) => silo[key] <= alvo).sort((a, b) => b[key] - a[key]).slice(0, 4).reverse();
           const maiores = siloPulmaoConfig.silos.filter((silo) => silo[key] > alvo).sort((a, b) => a[key] - b[key]).slice(0, 4);
-          const grid = document.createElement("div");
-          grid.className = "choice-card-grid";
-          [...menores, ...maiores].forEach((silo) => grid.appendChild(siloChoiceCard(silo)));
-          step.appendChild(grid);
+          [...menores, ...maiores].forEach((silo) => suggestionsBox.appendChild(siloChoiceCard(silo)));
         }
+        input.addEventListener("input", () => {
+          state.capacidadeDesejada = input.value;
+          state.silo = null;
+          resetAccessories();
+          updateSuggestions();
+        });
+        updateSuggestions();
         container.appendChild(step);
       }
     }
