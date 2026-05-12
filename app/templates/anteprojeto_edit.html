@@ -63,15 +63,6 @@
 {% endif %}
 
 <section class="panel">
-  <div class="section-head" hidden>
-    <div>
-      <h2>{% if item_editando %}Editar item{% else %}Adicionar equipamentos{% endif %}</h2>
-      <p>Abra um equipamento, preencha os dados conhecidos e adicione ao anteprojeto.</p>
-    </div>
-    {% if item_editando %}
-    <a class="button" href="/anteprojetos/{{ anteprojeto.id }}">Cancelar edicao</a>
-    {% endif %}
-  </div>
   {% if item_editando %}
   <div class="section-head">
     <div>
@@ -87,28 +78,22 @@
     {% endif %}
     <input type="hidden" name="equipamento_modelo_id" id="equipamento-final-id" value="{{ item_editando.equipamento_modelo_id if item_editando else '' }}">
 
-    <div class="form-grid compact" hidden>
-      <label>Familia / produto pai
-        <select id="equipamento-nivel-0" data-placeholder="Selecione o produto pai">
-          <option value="">Selecione o produto pai</option>
-          {% for produto in produtos_pai %}
-          <option value="{{ produto.id }}" data-cadastro-nome="{{ produto.cadastro_nome }}" {% if item_editando_cadeia and item_editando_cadeia[0].id == produto.id %}selected{% endif %}>{{ produto.nome }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label data-variation-level>Variacao nivel 1
-        <select id="equipamento-nivel-1" data-placeholder="Selecione a variacao" disabled>
-          <option value="">Selecione a variacao</option>
-        </select>
-      </label>
-      <label data-variation-level>Variacao nivel 2 / modelo final
-        <select id="equipamento-nivel-2" data-placeholder="Selecione o modelo final" disabled>
-          <option value="">Selecione o modelo final</option>
-        </select>
-      </label>
+    <div style="display: none !important;" aria-hidden="true">
+      <select id="equipamento-nivel-0" data-placeholder="">
+        <option value=""></option>
+        {% for produto in produtos_pai %}
+        <option value="{{ produto.id }}" data-cadastro-nome="{{ produto.cadastro_nome }}" {% if item_editando_cadeia and item_editando_cadeia[0].id == produto.id %}selected{% endif %}>{{ produto.nome }}</option>
+        {% endfor %}
+      </select>
+      <select id="equipamento-nivel-1" data-placeholder="" disabled>
+        <option value=""></option>
+      </select>
+      <select id="equipamento-nivel-2" data-placeholder="" disabled>
+        <option value=""></option>
+      </select>
     </div>
 
-    <div class="cascade-path" id="equipamento-caminho-selecionado"></div>
+    <div class="cascade-path" id="equipamento-caminho-selecionado" hidden></div>
     <div class="loaded-attributes" id="equipamento-atributos-carregados"></div>
     <div class="loaded-options" id="equipamento-opcoes-carregadas"></div>
 
