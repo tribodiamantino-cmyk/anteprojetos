@@ -104,7 +104,7 @@
     <div class="loaded-attributes" id="equipamento-atributos-carregados"></div>
     <div class="loaded-options" id="equipamento-opcoes-carregadas"></div>
 
-    <div class="form-grid compact">
+    <div class="form-grid compact" data-final-fields>
       <label>Quantidade
         <input type="number" name="quantidade" min="1" value="{{ item_editando.quantidade if item_editando else 1 }}" required>
       </label>
@@ -120,11 +120,11 @@
       </label>
     </div>
 
-    <label>Observacao inicial
+    <label data-final-fields>Observacao inicial
       <textarea name="observacao_inicial" rows="3">{{ item_editando.observacao_inicial if item_editando else "" }}</textarea>
     </label>
 
-    <div class="actions">
+    <div class="actions" data-final-fields>
       <button class="button primary" type="submit">
         {% if item_editando %}Salvar alteracoes{% else %}Adicionar ao anteprojeto{% endif %}
       </button>

@@ -232,6 +232,7 @@
   const attrsBox = document.getElementById("equipamento-atributos-carregados");
   const optionsBox = document.getElementById("equipamento-opcoes-carregadas");
   const variationLabels = Array.from(form.querySelectorAll("[data-variation-level]"));
+  const finalFields = Array.from(form.querySelectorAll("[data-final-fields]"));
   const selectedChain = window.ITEM_EDITANDO_CADEIA || [];
   const selectedOptions = window.ITEM_EDITANDO_OPCOES || {};
 
@@ -253,6 +254,15 @@
         resetSelect(selects[index], selects[index].dataset.placeholder || "Selecione");
       }
     }
+  }
+
+  function setFinalFieldsVisible(visible) {
+    finalFields.forEach((element) => {
+      element.hidden = !visible;
+      element.querySelectorAll("input, select, textarea, button").forEach((field) => {
+        field.disabled = !visible;
+      });
+    });
   }
 
   function resetSelect(select, placeholder) {
@@ -330,6 +340,192 @@
     renderAttributes(attrs);
   }
 
+  function fluxoOptionByKey(options) {
+    return options.reduce((map, option) => {
+      map[option.chave] = option;
+      return map;
+    }, {});
+  }
+
+  function savedOptionValue(option) {
+    const saved = selectedOptions[String(option.id)] || {};
+    return saved.valor || "";
+  }
+
+  function fluxoHidden(option, value, disabled) {
+    const fragment = document.createDocumentFragment();
+    const present = document.createElement("input");
+    present.type = "hidden";
+    present.name = `opcao_presente__${option.id}`;
+    present.value = "1";
+    present.disabled = Boolean(disabled);
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = `opcao__${option.id}`;
+    input.value = value || "";
+    input.disabled = Boolean(disabled);
+
+    fragment.appendChild(present);
+    fragment.appendChild(input);
+    return { fragment, input, present };
+  }
+
+  function makeFluxoCard(label, value, selected, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "choice-card";
+    button.dataset.value = value;
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+    button.textContent = label;
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
+  function makeFluxoStep(titleText, option, choices, currentValue, onChange) {
+    const step = document.createElement("section");
+    step.className = "fluxo-step";
+
+    const title = document.createElement("h4");
+    title.textContent = titleText;
+    step.appendChild(title);
+
+    const hidden = fluxoHidden(option, currentValue);
+    step.appendChild(hidden.fragment);
+
+    const grid = document.createElement("div");
+    grid.className = "choice-card-grid";
+    choices.forEach((choice) => {
+      grid.appendChild(
+        makeFluxoCard(choice.label, choice.value, currentValue === choice.value, () => {
+          hidden.input.value = choice.value;
+          onChange(choice.value);
+        })
+      );
+    });
+    step.appendChild(grid);
+    return step;
+  }
+
+  function renderFluxoOptions(options) {
+    const optionMap = fluxoOptionByKey(options);
+    const tipo = optionMap.tipo_fluxo;
+    const graos = optionMap.fluxo_graos;
+    const impurezasToggle = optionMap.fluxo_impurezas_habilitado;
+    const impurezas = optionMap.fluxo_impurezas;
+    const moega = optionMap.moega;
+    const requiredOptions = [tipo, graos, impurezasToggle, impurezas, moega];
+    if (requiredOptions.some((option) => !option)) {
+      optionsBox.innerHTML = '<p class="muted">Configuracao do Fluxo incompleta.</p>';
+      setFinalFieldsVisible(false);
+      return;
+    }
+
+    const state = {
+      tipo: savedOptionValue(tipo),
+      graos: savedOptionValue(graos),
+      impurezasToggle: savedOptionValue(impurezasToggle) || "",
+      impurezas: savedOptionValue(impurezas),
+      moega: savedOptionValue(moega),
+    };
+
+    function isComplete() {
+      return Boolean(
+        state.tipo &&
+          state.graos &&
+          state.impurezasToggle &&
+          (state.impurezasToggle === "nao" || state.impurezas) &&
+          state.moega
+      );
+    }
+
+    function rerender() {
+      optionsBox.innerHTML = "";
+      setFinalFieldsVisible(isComplete());
+
+      const wrap = document.createElement("div");
+      wrap.className = "fluxo-wizard";
+      const title = document.createElement("h3");
+      title.textContent = "Adicionar Fluxo";
+      wrap.appendChild(title);
+
+      wrap.appendChild(
+        makeFluxoStep("Etapa 1 - Tipo de Fluxo", tipo, tipo.valores.map((value) => ({
+          label: value.rotulo,
+          value: value.valor,
+        })), state.tipo, (value) => {
+          state.tipo = value;
+          state.graos = "";
+          state.impurezasToggle = "";
+          state.impurezas = "";
+          state.moega = "";
+          rerender();
+        })
+      );
+
+      if (state.tipo) {
+        wrap.appendChild(
+          makeFluxoStep("Etapa 2 - Fluxo de Grãos", graos, graos.valores.map((value) => ({
+            label: value.rotulo,
+            value: value.valor,
+          })), state.graos, (value) => {
+            state.graos = value;
+            state.impurezasToggle = "";
+            state.impurezas = "";
+            state.moega = "";
+            rerender();
+          })
+        );
+      }
+
+      if (state.graos) {
+        wrap.appendChild(
+          makeFluxoStep("Etapa 3 - Fluxo de Impurezas", impurezasToggle, [
+            { label: "Sem fluxo de impurezas", value: "nao" },
+            { label: "Com fluxo de impurezas", value: "sim" },
+          ], state.impurezasToggle, (value) => {
+            state.impurezasToggle = value;
+            state.impurezas = "";
+            state.moega = "";
+            rerender();
+          })
+        );
+      }
+
+      if (state.impurezasToggle === "sim") {
+        wrap.appendChild(
+          makeFluxoStep("Etapa 3.1 - Capacidade do Fluxo de Impurezas", impurezas, impurezas.valores.map((value) => ({
+            label: value.rotulo,
+            value: value.valor,
+          })), state.impurezas, (value) => {
+            state.impurezas = value;
+            state.moega = "";
+            rerender();
+          })
+        );
+      } else {
+        const hidden = fluxoHidden(impurezas, "", true);
+        wrap.appendChild(hidden.fragment);
+      }
+
+      if (state.impurezasToggle === "nao" || state.impurezas) {
+        wrap.appendChild(
+          makeFluxoStep("Etapa 4 - Moega", moega, moega.valores.map((value) => ({
+            label: value.rotulo,
+            value: value.valor,
+          })), state.moega, (value) => {
+            state.moega = value;
+            rerender();
+          })
+        );
+      }
+
+      optionsBox.appendChild(wrap);
+    }
+
+    rerender();
+  }
+
   function renderOptions(options) {
     optionsBox.innerHTML = "";
     if (!options.length) {
@@ -337,8 +533,13 @@
       return;
     }
 
+    if (isFluxoSelected()) {
+      renderFluxoOptions(options);
+      return;
+    }
+
     const title = document.createElement("h3");
-    title.textContent = isFluxoSelected() ? "Fluxo" : "Configuracoes do item";
+    title.textContent = "Configuracoes do item";
     optionsBox.appendChild(title);
 
     const grid = document.createElement("div");
@@ -484,6 +685,7 @@
 
     if (!selectedId) {
       setVariationFieldsVisible(true);
+      setFinalFieldsVisible(true);
       for (let index = level + 1; index < selects.length; index += 1) {
         resetSelect(selects[index], selects[index].dataset.placeholder || "Selecione");
       }
@@ -493,6 +695,7 @@
 
     if (level === 0 && isFluxoSelected()) {
       setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
       finalInput.value = selectedId;
       pathBox.textContent = "Fluxo";
       attrsBox.innerHTML = "";
@@ -501,6 +704,7 @@
     }
 
     setVariationFieldsVisible(true);
+    setFinalFieldsVisible(true);
     const children = await loadChildren(level, selectedId);
     if (!children.length || level === selects.length - 1) {
       finalInput.value = selectedId;
@@ -522,6 +726,15 @@
     if (!finalInput.value) {
       event.preventDefault();
       attrsBox.innerHTML = '<p class="muted">Selecione o modelo final antes de adicionar ao anteprojeto.</p>';
+      return;
+    }
+    if (isFluxoSelected() && finalFields.some((element) => element.hidden)) {
+      event.preventDefault();
+      attrsBox.innerHTML = "";
+      const alert = document.createElement("p");
+      alert.className = "muted";
+      alert.textContent = "Complete todas as etapas do Fluxo antes de adicionar ao anteprojeto.";
+      optionsBox.appendChild(alert);
     }
   });
 
@@ -530,6 +743,7 @@
     selects[0].value = selectedChain[0].id;
     if (isFluxoSelected()) {
       setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
       finalInput.value = selectedChain[0].id;
       pathBox.textContent = "Fluxo";
       attrsBox.innerHTML = "";
@@ -556,5 +770,17 @@
     updatePath();
   }
 
-  preloadSelection().catch(() => {});
+  async function preloadInitialState() {
+    if (selectedChain.length) {
+      await preloadSelection();
+      return;
+    }
+    const realOptions = Array.from(selects[0].options).filter((option) => option.value);
+    if (realOptions.length === 1 && realOptions[0].dataset.cadastroNome === "Item 1 - Fluxo") {
+      selects[0].value = realOptions[0].value;
+      await chooseLevel(0);
+    }
+  }
+
+  preloadInitialState().catch(() => {});
 })();

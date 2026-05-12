@@ -674,6 +674,60 @@ legend {
   gap: 12px;
 }
 
+.fluxo-wizard {
+  display: grid;
+  gap: 18px;
+}
+
+.fluxo-wizard h3 {
+  margin-bottom: 0;
+}
+
+.fluxo-step {
+  display: grid;
+  gap: 10px;
+}
+
+.fluxo-step h4 {
+  color: #344054;
+  font-size: 15px;
+  margin-bottom: 0;
+}
+
+.choice-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.choice-card {
+  min-height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.25;
+  padding: 12px;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  overflow-wrap: anywhere;
+}
+
+.choice-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 8px 18px rgba(31, 41, 55, 0.08);
+}
+
+.choice-card[aria-pressed="true"] {
+  background: #edf6f1;
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+  color: var(--primary-dark);
+}
+
 .option-check {
   flex-direction: row;
   align-items: center;
