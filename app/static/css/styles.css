@@ -728,6 +728,20 @@ legend {
   color: var(--primary-dark);
 }
 
+.choice-card.silo-card {
+  display: grid;
+  gap: 4px;
+}
+
+.choice-card.silo-card span {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.choice-card.silo-card[aria-pressed="true"] span {
+  color: var(--primary-dark);
+}
+
 .transport-checklist {
   display: grid;
   gap: 10px;

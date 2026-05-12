@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 from typing import Annotated
 
@@ -201,6 +201,7 @@ def parse_item(row):
     item["resumo_transportador"] = ""
     item["resumo_maquina_limpeza"] = ""
     item["resumo_secador"] = ""
+    item["resumo_silo_pulmao"] = ""
     return item
 
 
@@ -213,6 +214,8 @@ def equipamento_nome_exibicao(nome):
         return "Máquina de Limpeza Grain Cleaner EC"
     if nome == "Item 4 - Secadores Process Dryer":
         return "Secador Process Dryer"
+    if nome == "Item 5 - Silo Pulmão Elevado":
+        return "Silo Pulmão Elevado"
     return nome
 
 
@@ -346,6 +349,84 @@ def collect_secador_campos(form):
     }
 
 
+def resumo_silo_pulmao(campos):
+    partes = [
+        "Silo Pulmão Elevado",
+        f"{campos.get('diametro')} ft",
+        f"{campos.get('aneis')} anéis",
+        f"{campos.get('ton')} Ton",
+    ]
+    if campos.get("sacas"):
+        partes.append(f"{campos.get('sacas')} scs")
+    termometria = campos.get("termometria_rotulo")
+    if termometria and campos.get("termometria") != "sem":
+        partes.append(termometria)
+        if campos.get("termometria_pacote_rotulo"):
+            partes.append(campos["termometria_pacote_rotulo"])
+    if campos.get("sensor_nivel") == "sim":
+        partes.append("Sensor de Nível")
+    if campos.get("aeracao") == "sim":
+        partes.append(f"Aeração {campos.get('aeracao_taxa')}")
+    if campos.get("escada_rotulo"):
+        partes.append(f"Escada {campos.get('escada_rotulo')}")
+    for extra in campos.get("escada_extras") or []:
+        if extra.get("rotulo"):
+            partes.append(extra["rotulo"])
+    return " | ".join(partes)
+
+
+SILO_TERMOMETRIA = {
+    "sem": "Sem Termometria",
+    "thermo_grain": "Thermo Grain",
+    "digital_grain": "Digital Grain",
+    "procer": "PROCER",
+}
+SILO_PACOTES = {
+    "pacote_1": "Pacote 1",
+    "pacote_2": "Pacote 2",
+}
+SILO_ESCADAS = {
+    "marinheiro": "Marinheiro",
+    "caracol": "Caracol",
+}
+SILO_EXTRAS = {
+    "guarda_corpo_beiral": "Guarda corpo de beiral",
+    "monovia_telhado": "Monovia do telhado",
+    "pontos_ancoragem": "Pontos de ancoragem",
+    "suporte_monope": "Suporte para monopé",
+}
+
+
+def collect_silo_pulmao_campos(form):
+    termometria = (form.get("silo_termometria") or "sem").strip()
+    pacote = (form.get("silo_termometria_pacote") or "").strip() if termometria != "sem" else ""
+    aeracao = (form.get("silo_aeracao") or "").strip()
+    escada = (form.get("silo_escada") or "").strip()
+    extras = []
+    for chave in form.getlist("silo_escada_extra"):
+        if chave in SILO_EXTRAS:
+            extras.append({"chave": chave, "rotulo": SILO_EXTRAS[chave]})
+    return {
+        "modo": (form.get("silo_modo") or "").strip(),
+        "diametro": (form.get("silo_diametro") or "").strip(),
+        "aneis": (form.get("silo_aneis") or "").strip(),
+        "ton": (form.get("silo_ton") or "").strip(),
+        "sacas": (form.get("silo_sacas") or "").strip(),
+        "capacidade_tipo": (form.get("silo_capacidade_tipo") or "").strip(),
+        "capacidade_desejada": (form.get("silo_capacidade_desejada") or "").strip(),
+        "termometria": termometria,
+        "termometria_rotulo": SILO_TERMOMETRIA.get(termometria, ""),
+        "termometria_pacote": pacote,
+        "termometria_pacote_rotulo": SILO_PACOTES.get(pacote, ""),
+        "sensor_nivel": (form.get("silo_sensor_nivel") or "").strip(),
+        "aeracao": aeracao,
+        "aeracao_taxa": (form.get("silo_aeracao_taxa") or "").strip() if aeracao == "sim" else "",
+        "escada": escada,
+        "escada_rotulo": SILO_ESCADAS.get(escada, ""),
+        "escada_extras": extras,
+    }
+
+
 TRANSPORTADOR_TIPOS = {
     "redler": "Redler",
     "correia": "Correia",
@@ -425,6 +506,9 @@ def carregar_opcoes_itens(conn, itens):
         elif item["equipamento_nome"] in ("Secador Process Dryer", "Item 4 - Secadores Process Dryer"):
             item["equipamento_nome"] = "Secador Process Dryer"
             item["resumo_secador"] = resumo_secador(item["campos"])
+        elif item["equipamento_nome"] in ("Silo Pulmão Elevado", "Item 5 - Silo Pulmão Elevado"):
+            item["equipamento_nome"] = "Silo Pulmão Elevado"
+            item["resumo_silo_pulmao"] = resumo_silo_pulmao(item["campos"])
     return itens
 
 
@@ -1560,6 +1644,7 @@ def editar_anteprojeto(
                     WHEN nome = 'Item 2 - Transportadores' THEN 'Transportadores'
                     WHEN nome = 'Item 3 - Máquina de Limpeza Grain Cleaner EC' THEN 'Máquina de Limpeza Grain Cleaner EC'
                     WHEN nome = 'Item 4 - Secadores Process Dryer' THEN 'Secadores Process Dryer'
+                    WHEN nome = 'Item 5 - Silo Pulmão Elevado' THEN 'Silo Pulmão Elevado'
                     ELSE nome
                 END AS nome,
                 nome AS cadastro_nome
@@ -1713,6 +1798,8 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             campos = collect_maquina_limpeza_campos(form)
         elif equipamento["nome"] == "Item 4 - Secadores Process Dryer":
             campos = collect_secador_campos(form)
+        elif equipamento["nome"] == "Item 5 - Silo Pulmão Elevado":
+            campos = collect_silo_pulmao_campos(form)
         else:
             campos = collect_campos(form, schema)
         campos_json = json.dumps(campos, ensure_ascii=False)
@@ -1940,3 +2027,4 @@ def visualizar_versao(request: Request, anteprojeto_id: int, versao_id: int):
             "snapshot_json_formatado": json.dumps(snapshot, ensure_ascii=False, indent=2),
         },
     )
+
