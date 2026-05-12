@@ -63,7 +63,7 @@
 {% endif %}
 
 <section class="panel">
-  <div class="section-head">
+  <div class="section-head" hidden>
     <div>
       <h2>{% if item_editando %}Editar item{% else %}Adicionar equipamentos{% endif %}</h2>
       <p>Abra um equipamento, preencha os dados conhecidos e adicione ao anteprojeto.</p>
@@ -72,6 +72,14 @@
     <a class="button" href="/anteprojetos/{{ anteprojeto.id }}">Cancelar edicao</a>
     {% endif %}
   </div>
+  {% if item_editando %}
+  <div class="section-head">
+    <div>
+      <h2>Editar Fluxo</h2>
+    </div>
+    <a class="button" href="/anteprojetos/{{ anteprojeto.id }}">Cancelar edicao</a>
+  </div>
+  {% endif %}
 
   <form class="item-form cascade-form" method="post" action="/anteprojetos/{{ anteprojeto.id }}/itens" id="cascade-equipment-form">
     {% if item_editando %}
@@ -79,7 +87,7 @@
     {% endif %}
     <input type="hidden" name="equipamento_modelo_id" id="equipamento-final-id" value="{{ item_editando.equipamento_modelo_id if item_editando else '' }}">
 
-    <div class="form-grid compact">
+    <div class="form-grid compact" hidden>
       <label>Familia / produto pai
         <select id="equipamento-nivel-0" data-placeholder="Selecione o produto pai">
           <option value="">Selecione o produto pai</option>
