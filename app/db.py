@@ -188,6 +188,7 @@ def init_db():
         migrate_equipamentos(conn)
         seed_equipamentos(conn)
         ensure_default_equipamentos(conn)
+        prune_equipamentos_to_fluxo(conn)
         seed_admin(conn)
 
 
@@ -375,6 +376,47 @@ def seed_equipamentos(conn):
 
 def ensure_default_equipamentos(conn):
     ensure_item1_fluxo(conn)
+
+
+def prune_equipamentos_to_fluxo(conn):
+    fluxo = conn.execute(
+        "SELECT id FROM equipamentos_modelo WHERE nome = ?",
+        ("Item 1 - Fluxo",),
+    ).fetchone()
+    if not fluxo:
+        return
+
+    removidos = conn.execute(
+        "SELECT id FROM equipamentos_modelo WHERE id <> ?",
+        (fluxo["id"],),
+    ).fetchall()
+    removidos_ids = [row["id"] for row in removidos]
+    if not removidos_ids:
+        return
+
+    placeholders = ",".join("?" for _ in removidos_ids)
+    itens_removidos = conn.execute(
+        f"SELECT id FROM itens_anteprojeto WHERE equipamento_modelo_id IN ({placeholders})",
+        tuple(removidos_ids),
+    ).fetchall()
+    item_ids = [row["id"] for row in itens_removidos]
+    if item_ids:
+        item_placeholders = ",".join("?" for _ in item_ids)
+        conn.execute(
+            f"DELETE FROM itens_anteprojeto_opcoes WHERE item_anteprojeto_id IN ({item_placeholders})",
+            tuple(item_ids),
+        )
+        conn.execute(
+            f"DELETE FROM historico_item WHERE item_id IN ({item_placeholders})",
+            tuple(item_ids),
+        )
+        conn.execute(
+            f"DELETE FROM itens_anteprojeto WHERE id IN ({item_placeholders})",
+            tuple(item_ids),
+        )
+
+    conn.execute("UPDATE equipamentos_modelo SET parent_id = NULL WHERE id <> ?", (fluxo["id"],))
+    conn.execute(f"DELETE FROM equipamentos_modelo WHERE id IN ({placeholders})", tuple(removidos_ids))
 
 
 def ensure_item1_fluxo(conn):
