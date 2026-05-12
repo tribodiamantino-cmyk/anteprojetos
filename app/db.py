@@ -187,7 +187,7 @@ def init_db():
         )
         migrate_equipamentos(conn)
         seed_equipamentos(conn)
-        seed_silo_fundo_plano_evo50_exemplo(conn)
+        ensure_default_equipamentos(conn)
         seed_admin(conn)
 
 
@@ -373,169 +373,160 @@ def seed_equipamentos(conn):
     migrate_schema_json_to_atributos(conn)
 
 
-def insert_equipamento_seed(
-    conn,
-    nome,
-    parent_id=None,
-    categoria="",
-    subcategoria="",
-    fabricante="",
-    modelo="",
-):
-    cur = conn.execute(
-        """
-        INSERT INTO equipamentos_modelo
-        (parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            parent_id,
-            nome,
-            "",
-            categoria,
-            subcategoria,
-            fabricante,
-            modelo,
-            json.dumps({"nome": nome, "campos": []}, ensure_ascii=False),
-            1,
-        ),
+def ensure_default_equipamentos(conn):
+    ensure_item1_fluxo(conn)
+
+
+def ensure_item1_fluxo(conn):
+    nome = "Item 1 - Fluxo"
+    schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
+    equipamento = conn.execute(
+        "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
+        (nome,),
+    ).fetchone()
+
+    if equipamento:
+        equipamento_id = equipamento["id"]
+        conn.execute(
+            """
+            UPDATE equipamentos_modelo
+            SET descricao = ?, categoria = ?, subcategoria = ?, fabricante = ?,
+                modelo = ?, schema_json = ?, ativo = 1,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                "Configuracao inicial do fluxo operacional do anteprojeto.",
+                "Configuracao",
+                "Fluxo",
+                "",
+                "",
+                schema_json,
+                equipamento_id,
+            ),
+        )
+    else:
+        cur = conn.execute(
+            """
+            INSERT INTO equipamentos_modelo
+            (parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                None,
+                nome,
+                "Configuracao inicial do fluxo operacional do anteprojeto.",
+                "Configuracao",
+                "Fluxo",
+                "",
+                "",
+                schema_json,
+                1,
+            ),
+        )
+        equipamento_id = cur.lastrowid
+
+    capacidades = ["40", "50", "60", "80", "120", "150", "200", "240", "300", "400"]
+    upsert_opcao_equipamento(
+        conn,
+        equipamento_id,
+        nome="Tipo de Fluxo",
+        chave="tipo_fluxo",
+        tipo="selecao",
+        valores=[
+            ("fluxo_simples", "Fluxo Simples"),
+            ("fluxo_duplo", "Fluxo Duplo"),
+            ("fluxo_simples_previsao_duplo", "Fluxo Simples com previsão de duplo"),
+        ],
+        ordem=1,
+        obrigatorio=1,
     )
-    return cur.lastrowid
-
-
-def insert_atributo_seed(conn, equipamento_id, nome, chave, tipo, valor="", unidade="", ordem=0):
+    upsert_opcao_equipamento(
+        conn,
+        equipamento_id,
+        nome="Fluxo de Grãos (Ton/h)",
+        chave="fluxo_graos",
+        tipo="selecao",
+        valores=[(capacidade, f"{capacidade} Ton/h") for capacidade in capacidades],
+        ordem=2,
+        obrigatorio=1,
+    )
+    impurezas_id = upsert_opcao_equipamento(
+        conn,
+        equipamento_id,
+        nome="Fluxo de Impurezas",
+        chave="fluxo_impurezas_habilitado",
+        tipo="booleano",
+        ordem=3,
+        obrigatorio=0,
+    )
+    capacidade_impurezas_id = upsert_opcao_equipamento(
+        conn,
+        equipamento_id,
+        nome="Fluxo de Impurezas (Ton/h)",
+        chave="fluxo_impurezas",
+        tipo="selecao",
+        valores=[(capacidade, f"{capacidade} Ton/h") for capacidade in capacidades],
+        ordem=4,
+        obrigatorio=1,
+    )
     conn.execute(
         """
-        INSERT OR IGNORE INTO equipamentos_atributos
-        (equipamento_id, nome, chave, tipo, valor, unidade, ordem, obrigatorio, visivel_resumo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO equipamentos_opcoes_dependencias
+        (opcao_id, depende_opcao_id, depende_valor)
+        VALUES (?, ?, ?)
         """,
-        (equipamento_id, nome, chave, tipo, valor, unidade, ordem, 0, 1),
+        (capacidade_impurezas_id, impurezas_id, "sim"),
     )
 
 
-def seed_silo_fundo_plano_evo50_exemplo(conn):
-    existente = conn.execute(
-        "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
-        ("Silo Fundo Plano EVO 50",),
-    ).fetchone()
-    if existente:
-        total_opcoes = conn.execute(
-            "SELECT COUNT(*) FROM equipamentos_opcoes WHERE equipamento_id = ?",
-            (existente["id"],),
-        ).fetchone()[0]
-        if not total_opcoes:
-            seed_opcoes_silo_evo50(conn, existente["id"])
-        return
-
-    silo_id = insert_equipamento_seed(
-        conn,
-        "Silo Fundo Plano EVO 50",
-        categoria="Silo",
-        subcategoria="Fundo Plano",
-        fabricante="GSI",
-        modelo="EVO 50",
-    )
-    insert_atributo_seed(conn, silo_id, "Linha", "linha", "texto", "EVO 50", "", 1)
-    insert_atributo_seed(conn, silo_id, "Tipo de silo", "tipo_silo", "texto", "Fundo Plano", "", 2)
-    seed_opcoes_silo_evo50(conn, silo_id)
-
-    for diametro_ordem, diametro_pes in enumerate((18, 21, 24), start=1):
-        diametro_id = insert_equipamento_seed(conn, f"Diametro {diametro_pes}'", parent_id=silo_id)
-        insert_atributo_seed(
-            conn,
-            diametro_id,
-            "Diametro em pes",
-            "diametro_pes",
-            "numero",
-            str(diametro_pes),
-            "pes",
-            1,
-        )
-        insert_atributo_seed(conn, diametro_id, "Diametro em metros", "diametro_m", "numero", "", "m", 2)
-
-        for aneis in range(6, 13):
-            aneis_id = insert_equipamento_seed(conn, f"{aneis} aneis", parent_id=diametro_id)
-            insert_atributo_seed(conn, aneis_id, "Aneis", "aneis", "inteiro", str(aneis), "", 1)
-            insert_atributo_seed(conn, aneis_id, "Capacidade m3", "capacidade_m3", "numero", "", "m3", 2)
-            insert_atributo_seed(conn, aneis_id, "Capacidade t", "capacidade_t", "numero", "", "t", 3)
-            insert_atributo_seed(conn, aneis_id, "Sacas", "sacas", "numero", "", "sc", 4)
-            insert_atributo_seed(conn, aneis_id, "Altura corpo", "altura_corpo_m", "numero", "", "m", 5)
-            insert_atributo_seed(conn, aneis_id, "Altura total", "altura_total_m", "numero", "", "m", 6)
-
-
-def insert_opcao_seed(conn, equipamento_id, nome, chave, tipo, valores=None, ordem=0, obrigatorio=0):
-    cur = conn.execute(
-        """
-        INSERT OR IGNORE INTO equipamentos_opcoes
-        (equipamento_id, nome, chave, tipo, obrigatorio, ordem, ativo)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (equipamento_id, nome, chave, tipo, obrigatorio, ordem, 1),
-    )
+def upsert_opcao_equipamento(
+    conn,
+    equipamento_id,
+    nome,
+    chave,
+    tipo,
+    valores=None,
+    ordem=0,
+    obrigatorio=0,
+):
     opcao = conn.execute(
         "SELECT id FROM equipamentos_opcoes WHERE equipamento_id = ? AND chave = ?",
         (equipamento_id, chave),
     ).fetchone()
-    opcao_id = opcao["id"] if opcao else cur.lastrowid
-
-    for index, valor in enumerate(valores or [], start=1):
+    if opcao:
+        opcao_id = opcao["id"]
         conn.execute(
             """
-            INSERT OR IGNORE INTO equipamentos_opcoes_valores
+            UPDATE equipamentos_opcoes
+            SET nome = ?, tipo = ?, obrigatorio = ?, ordem = ?, ativo = 1
+            WHERE id = ?
+            """,
+            (nome, tipo, obrigatorio, ordem, opcao_id),
+        )
+    else:
+        cur = conn.execute(
+            """
+            INSERT INTO equipamentos_opcoes
+            (equipamento_id, nome, chave, tipo, obrigatorio, ordem, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (equipamento_id, nome, chave, tipo, obrigatorio, ordem, 1),
+        )
+        opcao_id = cur.lastrowid
+
+    conn.execute("DELETE FROM equipamentos_opcoes_valores WHERE opcao_id = ?", (opcao_id,))
+    for index, (valor, rotulo) in enumerate(valores or [], start=1):
+        conn.execute(
+            """
+            INSERT INTO equipamentos_opcoes_valores
             (opcao_id, valor, rotulo, ordem, ativo)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (opcao_id, valor[0], valor[1], index, 1),
+            (opcao_id, valor, rotulo, index, 1),
         )
 
-
-def seed_opcoes_silo_evo50(conn, silo_id):
-    insert_opcao_seed(
-        conn,
-        silo_id,
-        "Escada",
-        "escada",
-        "selecao",
-        [("marinheiro", "Marinheiro"), ("caracol", "Caracol")],
-        1,
-    )
-    insert_opcao_seed(
-        conn,
-        silo_id,
-        "Termometria",
-        "termometria",
-        "selecao",
-        [("nenhuma", "Nenhuma"), ("analogica", "Analogica"), ("digital", "Digital")],
-        2,
-    )
-    insert_opcao_seed(
-        conn,
-        silo_id,
-        "Rosca varredora",
-        "rosca_varredora",
-        "selecao",
-        [
-            ("nenhuma", "Nenhuma"),
-            ("standard", "Standard"),
-            ("semiautomatica", "Semiautomatica"),
-            ("automatica", "Automatica"),
-        ],
-        3,
-    )
-    insert_opcao_seed(conn, silo_id, "Sensor de nivel", "sensor_nivel", "booleano", ordem=4)
-    insert_opcao_seed(conn, silo_id, "Porta intermediaria", "porta_intermediaria", "booleano", ordem=5)
-    insert_opcao_seed(conn, silo_id, "Descarga lateral", "descarga_lateral", "booleano", ordem=6)
-    insert_opcao_seed(conn, silo_id, "Aeracao", "aeracao", "booleano", ordem=7)
-    insert_opcao_seed(
-        conn,
-        silo_id,
-        "Espalhador",
-        "espalhador",
-        "selecao",
-        [("nenhum", "Nenhum"), ("eg", "EG"), ("5000", "5000"), ("10000", "10000")],
-        8,
-    )
+    return opcao_id
 
 
 def obter_caminho_equipamento(conn, equipamento_id):

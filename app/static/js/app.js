@@ -312,12 +312,12 @@
   function renderOptions(options) {
     optionsBox.innerHTML = "";
     if (!options.length) {
-      optionsBox.innerHTML = '<p class="muted">Nenhum acessorio/opcional cadastrado para este item.</p>';
+      optionsBox.innerHTML = '<p class="muted">Nenhuma configuracao cadastrada para este item.</p>';
       return;
     }
 
     const title = document.createElement("h3");
-    title.textContent = "Acessorios e opcionais";
+    title.textContent = "Configuracoes do item";
     optionsBox.appendChild(title);
 
     const grid = document.createElement("div");
@@ -348,7 +348,7 @@
         input.value = "sim";
         input.checked = saved.valor === "sim";
         label.appendChild(input);
-        label.appendChild(document.createTextNode(`${option.nome}: Sim`));
+        label.appendChild(document.createTextNode(option.nome));
       } else if (option.tipo === "selecao") {
         const select = document.createElement("select");
         select.name = `opcao__${option.id}`;

@@ -164,7 +164,7 @@
             {% if item.observacao_inicial %}<p><strong>Obs. inicial:</strong> {{ item.observacao_inicial }}</p>{% endif %}
             {% if item.opcoes %}
             <div class="item-options">
-              <strong>Acessorios:</strong>
+              <strong>Configuracoes:</strong>
               <ul>
                 {% for opcao in item.opcoes %}
                 <li>{{ opcao.opcao_nome }}: {{ opcao.valor_rotulo or opcao.valor or "-" }}</li>

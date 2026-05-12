@@ -49,13 +49,15 @@ Tabelas principais:
 - `itens_anteprojeto`
 - `historico_item`
 
-Na primeira execucao, o sistema cria as tabelas e carrega os equipamentos iniciais a partir de:
+Na primeira execucao, o sistema cria as tabelas. Por padrao, nenhum equipamento e carregado automaticamente para que os cadastros sejam modelados item a item pela tela `Equipamentos`.
+
+Se precisar reativar uma carga inicial no futuro, preencha:
 
 ```text
 app/data/equipamentos_seed.json
 ```
 
-Depois da primeira carga, os equipamentos passam a ser mantidos no banco SQLite pela tela `Equipamentos`.
+E inicie a aplicacao com `SEED_EQUIPAMENTOS=1`.
 
 ## Comandos Git
 
