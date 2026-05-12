@@ -200,6 +200,7 @@ def parse_item(row):
     item["resumo_fluxo"] = ""
     item["resumo_transportador"] = ""
     item["resumo_maquina_limpeza"] = ""
+    item["resumo_secador"] = ""
     return item
 
 
@@ -210,6 +211,8 @@ def equipamento_nome_exibicao(nome):
         return "Transportador"
     if nome == "Item 3 - Máquina de Limpeza Grain Cleaner EC":
         return "Máquina de Limpeza Grain Cleaner EC"
+    if nome == "Item 4 - Secadores Process Dryer":
+        return "Secador Process Dryer"
     return nome
 
 
@@ -280,6 +283,66 @@ def collect_maquina_limpeza_campos(form):
         "tipo_limpeza_rotulo": MAQUINA_LIMPEZA_TIPOS.get(tipo, tipo),
         "modelo": modelo,
         "modelo_rotulo": MAQUINA_LIMPEZA_MODELOS.get(modelo, modelo),
+    }
+
+
+def resumo_secador(campos):
+    modelo = campos.get("modelo_rotulo") or "-"
+    fornalha = campos.get("fornalha") or "sem"
+    alimentador = campos.get("alimentador") or "sem"
+    partes = [f"Secador Process Dryer | {modelo}"]
+    if fornalha == "com":
+        combustivel = campos.get("combustivel_rotulo") or "-"
+        partes.append(f"Fornalha Black Velox - {combustivel}")
+    else:
+        partes.append("Sem Fornalha")
+    if alimentador == "com":
+        volume = campos.get("alimentador_volume_rotulo") or "-"
+        partes.append(f"Alimentador de Cavaco - {volume}")
+    else:
+        partes.append("Sem Alimentador")
+    return " | ".join(partes)
+
+
+SECADOR_MODELOS = {
+    "scc_202_22": "SCC-202 - 22 t/h",
+    "scc_302_33": "SCC-302 - 33 t/h",
+    "scc_303_49": "SCC-303 - 49 t/h",
+    "scc_304_66": "SCC-304 - 66 t/h",
+    "scc_404_88": "SCC-404 - 88 t/h",
+    "scc_504_110": "SCC-504 - 110 t/h",
+    "scc_505_138": "SCC-505 - 138 t/h",
+    "scc_605_165": "SCC-605 - 165 t/h",
+    "scc_705_193": "SCC-705 - 193 t/h",
+    "scc_707_238": "SCC-707 - 238 t/h",
+    "scc_707_plus_264": "SCC-707 Plus - 264 t/h",
+}
+SECADOR_COMBUSTIVEIS = {
+    "cavaco": "Cavaco",
+    "lenha": "Lenha",
+}
+SECADOR_VOLUMES = {
+    "6_35": "6,35 m³",
+    "13": "13 m³",
+    "20": "20 m³",
+}
+
+
+def collect_secador_campos(form):
+    modelo = (form.get("secador_modelo") or "").strip()
+    fornalha = (form.get("secador_fornalha") or "sem").strip()
+    combustivel = (form.get("secador_combustivel") or "").strip() if fornalha == "com" else ""
+    alimentador = (form.get("secador_alimentador") or "sem").strip()
+    volume = (form.get("secador_alimentador_volume") or "").strip() if alimentador == "com" else ""
+    return {
+        "modelo": modelo,
+        "modelo_rotulo": SECADOR_MODELOS.get(modelo, modelo),
+        "fornalha": fornalha,
+        "combustivel": combustivel,
+        "combustivel_rotulo": SECADOR_COMBUSTIVEIS.get(combustivel, ""),
+        "alimentador": alimentador,
+        "alimentador_volume": volume,
+        "alimentador_volume_rotulo": SECADOR_VOLUMES.get(volume, ""),
     }
 
 
@@ -359,6 +422,9 @@ def carregar_opcoes_itens(conn, itens):
         ):
             item["equipamento_nome"] = "Máquina de Limpeza Grain Cleaner EC"
             item["resumo_maquina_limpeza"] = resumo_maquina_limpeza(item["campos"])
+        elif item["equipamento_nome"] in ("Secador Process Dryer", "Item 4 - Secadores Process Dryer"):
+            item["equipamento_nome"] = "Secador Process Dryer"
+            item["resumo_secador"] = resumo_secador(item["campos"])
     return itens
 
 
@@ -1493,6 +1559,7 @@ def editar_anteprojeto(
                     WHEN nome = 'Item 1 - Fluxo' THEN 'Fluxo'
                     WHEN nome = 'Item 2 - Transportadores' THEN 'Transportadores'
                     WHEN nome = 'Item 3 - Máquina de Limpeza Grain Cleaner EC' THEN 'Máquina de Limpeza Grain Cleaner EC'
+                    WHEN nome = 'Item 4 - Secadores Process Dryer' THEN 'Secadores Process Dryer'
                     ELSE nome
                 END AS nome,
                 nome AS cadastro_nome
@@ -1644,6 +1711,8 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             campos = collect_transportador_campos(form)
         elif equipamento["nome"] == "Item 3 - Máquina de Limpeza Grain Cleaner EC":
             campos = collect_maquina_limpeza_campos(form)
+        elif equipamento["nome"] == "Item 4 - Secadores Process Dryer":
+            campos = collect_secador_campos(form)
         else:
             campos = collect_campos(form, schema)
         campos_json = json.dumps(campos, ensure_ascii=False)

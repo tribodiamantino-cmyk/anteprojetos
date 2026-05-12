@@ -294,6 +294,39 @@
     },
   };
 
+  const secadorConfig = {
+    modelos: [
+      { value: "scc_202_22", label: "SCC-202 - 22 t/h" },
+      { value: "scc_302_33", label: "SCC-302 - 33 t/h" },
+      { value: "scc_303_49", label: "SCC-303 - 49 t/h" },
+      { value: "scc_304_66", label: "SCC-304 - 66 t/h" },
+      { value: "scc_404_88", label: "SCC-404 - 88 t/h" },
+      { value: "scc_504_110", label: "SCC-504 - 110 t/h" },
+      { value: "scc_505_138", label: "SCC-505 - 138 t/h" },
+      { value: "scc_605_165", label: "SCC-605 - 165 t/h" },
+      { value: "scc_705_193", label: "SCC-705 - 193 t/h" },
+      { value: "scc_707_238", label: "SCC-707 - 238 t/h" },
+      { value: "scc_707_plus_264", label: "SCC-707 Plus - 264 t/h" },
+    ],
+    fornalha: [
+      { value: "sem", label: "Sem Fornalha" },
+      { value: "com", label: "Com Fornalha Black Velox" },
+    ],
+    combustiveis: [
+      { value: "cavaco", label: "Cavaco" },
+      { value: "lenha", label: "Lenha" },
+    ],
+    alimentador: [
+      { value: "sem", label: "Sem Alimentador" },
+      { value: "com", label: "Com Alimentador de Cavaco" },
+    ],
+    volumes: [
+      { value: "6_35", label: "6,35 m³" },
+      { value: "13", label: "13 m³" },
+      { value: "20", label: "20 m³" },
+    ],
+  };
+
   function selectedCadastroNome() {
     const option = selects[0].selectedOptions[0];
     return option ? option.dataset.cadastroNome || option.textContent : "";
@@ -312,6 +345,10 @@
       selectedCadastroNome() === "Item 3 - Máquina de Limpeza Grain Cleaner EC" ||
       selectedPath()[0] === "Máquina de Limpeza Grain Cleaner EC"
     );
+  }
+
+  function isSecadorSelected() {
+    return selectedCadastroNome() === "Item 4 - Secadores Process Dryer" || selectedPath()[0] === "Secadores Process Dryer";
   }
 
   function setVariationFieldsVisible(visible) {
@@ -859,6 +896,117 @@
     rerender();
   }
 
+  function renderSecadorOptions() {
+    const state = {
+      modelo: selectedCampos.modelo || "",
+      fornalha: selectedCampos.fornalha || "",
+      combustivel: selectedCampos.combustivel || "",
+      alimentador: selectedCampos.alimentador || "",
+      volume: selectedCampos.alimentador_volume || "",
+    };
+
+    function isComplete() {
+      return Boolean(
+        state.modelo &&
+          state.fornalha &&
+          (state.fornalha === "sem" || state.combustivel) &&
+          state.alimentador &&
+          (state.alimentador === "sem" || state.volume)
+      );
+    }
+
+    function renderHiddenFields(container) {
+      container.appendChild(hiddenInput("secador_modelo", state.modelo));
+      container.appendChild(hiddenInput("secador_fornalha", state.fornalha));
+      container.appendChild(hiddenInput("secador_combustivel", state.combustivel));
+      container.appendChild(hiddenInput("secador_alimentador", state.alimentador));
+      container.appendChild(hiddenInput("secador_alimentador_volume", state.volume));
+    }
+
+    function renderStep(titleText, choices, currentValue, onChange) {
+      const step = document.createElement("section");
+      step.className = "fluxo-step";
+      const title = document.createElement("h4");
+      title.textContent = titleText;
+      step.appendChild(title);
+      const grid = document.createElement("div");
+      grid.className = "choice-card-grid";
+      choices.forEach((choice) => {
+        grid.appendChild(makeFluxoCard(choice.label, choice.value, currentValue === choice.value, () => onChange(choice.value)));
+      });
+      step.appendChild(grid);
+      return step;
+    }
+
+    function rerender() {
+      optionsBox.innerHTML = "";
+      setFinalFieldsVisible(isComplete());
+      const wrap = document.createElement("div");
+      wrap.className = "fluxo-wizard";
+      const title = document.createElement("h3");
+      title.textContent = "Secadores Process Dryer";
+      wrap.appendChild(title);
+      renderHiddenFields(wrap);
+
+      wrap.appendChild(
+        renderStep("Etapa 1 - Modelo do Secador", secadorConfig.modelos, state.modelo, (value) => {
+          state.modelo = value;
+          state.fornalha = "";
+          state.combustivel = "";
+          state.alimentador = "";
+          state.volume = "";
+          rerender();
+        })
+      );
+
+      if (state.modelo) {
+        wrap.appendChild(
+          renderStep("Etapa 2 - Fornalha Black Velox", secadorConfig.fornalha, state.fornalha, (value) => {
+            state.fornalha = value;
+            state.combustivel = "";
+            state.alimentador = "";
+            state.volume = "";
+            rerender();
+          })
+        );
+      }
+
+      if (state.fornalha === "com") {
+        wrap.appendChild(
+          renderStep("Tipo de combustível", secadorConfig.combustiveis, state.combustivel, (value) => {
+            state.combustivel = value;
+            state.alimentador = "";
+            state.volume = "";
+            rerender();
+          })
+        );
+      }
+
+      if (state.fornalha === "sem" || state.combustivel) {
+        wrap.appendChild(
+          renderStep("Etapa 3 - Alimentador de Cavaco", secadorConfig.alimentador, state.alimentador, (value) => {
+            state.alimentador = value;
+            state.volume = "";
+            rerender();
+          })
+        );
+      }
+
+      if (state.alimentador === "com") {
+        wrap.appendChild(
+          renderStep("Volume do Alimentador de Cavaco", secadorConfig.volumes, state.volume, (value) => {
+            state.volume = value;
+            rerender();
+          })
+        );
+      }
+
+      optionsBox.appendChild(wrap);
+    }
+
+    rerender();
+  }
+
   function renderOptions(options) {
     optionsBox.innerHTML = "";
     if (isFluxoSelected()) {
@@ -871,6 +1019,10 @@
     }
     if (isMaquinaLimpezaSelected()) {
       renderMaquinaLimpezaOptions();
+      return;
+    }
+    if (isSecadorSelected()) {
+      renderSecadorOptions();
       return;
     }
     if (!options.length) {
@@ -1063,6 +1215,16 @@
       return;
     }
 
+    if (level === 0 && isSecadorSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedId;
+      pathBox.textContent = "Secadores Process Dryer";
+      attrsBox.innerHTML = "";
+      await loadOptions(selectedId);
+      return;
+    }
+
     setVariationFieldsVisible(true);
     setFinalFieldsVisible(true);
     const children = await loadChildren(level, selectedId);
@@ -1089,7 +1251,7 @@
       return;
     }
     if (
-      (isFluxoSelected() || isTransportadorSelected() || isMaquinaLimpezaSelected()) &&
+      (isFluxoSelected() || isTransportadorSelected() || isMaquinaLimpezaSelected() || isSecadorSelected()) &&
       finalFields.some((element) => element.hidden)
     ) {
       event.preventDefault();
@@ -1127,6 +1289,15 @@
       setFinalFieldsVisible(false);
       finalInput.value = selectedChain[0].id;
       pathBox.textContent = "Máquina de Limpeza Grain Cleaner EC";
+      attrsBox.innerHTML = "";
+      await loadOptions(finalInput.value);
+      return;
+    }
+    if (isSecadorSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedChain[0].id;
+      pathBox.textContent = "Secadores Process Dryer";
       attrsBox.innerHTML = "";
       await loadOptions(finalInput.value);
       return;
