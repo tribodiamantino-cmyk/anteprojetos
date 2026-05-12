@@ -534,6 +534,37 @@
     return button;
   }
 
+  function askAlternarEscadas(onAnswer) {
+    const existing = document.querySelector(".modal-overlay");
+    if (existing) existing.remove();
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    const modal = document.createElement("div");
+    modal.className = "choice-modal";
+    const title = document.createElement("h3");
+    title.textContent = "Alternar escadas caracol e marinheiro?";
+    const actions = document.createElement("div");
+    actions.className = "choice-modal-actions";
+    [
+      { value: "sim", label: "Sim" },
+      { value: "nao", label: "Não" },
+    ].forEach((choice) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button primary";
+      button.textContent = choice.label;
+      button.addEventListener("click", () => {
+        overlay.remove();
+        onAnswer(choice.value);
+      });
+      actions.appendChild(button);
+    });
+    modal.appendChild(title);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+
   function makeFluxoStep(titleText, option, choices, currentValue, onChange) {
     const step = document.createElement("section");
     step.className = "fluxo-step";
@@ -1225,11 +1256,19 @@
       if (state.sensorNivel) wrap.appendChild(renderStep("Aeração", siloPulmaoConfig.simNao, state.aeracao, (value) => { state.aeracao = value; state.taxa = ""; state.escada = ""; state.extras = []; rerender(); }));
       if (state.aeracao === "sim") wrap.appendChild(renderStep("Taxa de Aeração", siloPulmaoConfig.taxas, state.taxa, (value) => { state.taxa = value; rerender(); }));
       if (state.aeracao === "nao" || state.taxa) wrap.appendChild(renderStep("Tipo de Escada", siloPulmaoConfig.escadas, state.escada, (value) => { state.escada = value; state.alternarEscadas = ""; state.extras = []; rerender(); }));
-      if (Number(quantidadeInput ? quantidadeInput.value : 1) <= 1) {
+      const quantidade = Number(quantidadeInput ? quantidadeInput.value : 1);
+      if (quantidade <= 1) {
         state.alternarEscadas = "";
       }
-      if (state.escada && Number(quantidadeInput ? quantidadeInput.value : 1) > 1) {
-        wrap.appendChild(renderStep("Alternar escadas caracol e marinheiro?", siloPulmaoConfig.simNao, state.alternarEscadas, (value) => { state.alternarEscadas = value; rerender(); }));
+      if (state.escada && quantidade > 1 && !state.alternarEscadas) {
+        setTimeout(() => {
+          if (isSiloPulmaoSelected() && Number(quantidadeInput ? quantidadeInput.value : 1) > 1 && !state.alternarEscadas) {
+            askAlternarEscadas((value) => {
+              state.alternarEscadas = value;
+              rerender();
+            });
+          }
+        }, 0);
       }
       if (state.escada) renderExtraCards(wrap);
       optionsBox.appendChild(wrap);
