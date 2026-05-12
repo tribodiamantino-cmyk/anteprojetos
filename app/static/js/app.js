@@ -1070,6 +1070,14 @@
       extras: (selectedCampos.escada_extras || []).map((item) => item.chave).filter(Boolean),
     };
 
+    if (quantidadeInput) {
+      quantidadeInput.oninput = () => {
+        if (isSiloPulmaoSelected()) {
+          rerender();
+        }
+      };
+    }
+
     const fmt = (value) => Number(value || 0).toLocaleString("pt-BR");
     const resetAccessories = () => {
       state.termometria = ""; state.pacote = ""; state.sensorNivel = ""; state.aeracao = ""; state.taxa = ""; state.escada = ""; state.extras = [];
@@ -1480,14 +1488,6 @@
       });
     });
   });
-
-  if (quantidadeInput) {
-    quantidadeInput.addEventListener("input", () => {
-      if (isSiloPulmaoSelected()) {
-        loadOptions(finalInput.value).catch(() => {});
-      }
-    });
-  }
 
   form.addEventListener("submit", (event) => {
     if (!finalInput.value) {
