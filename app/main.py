@@ -198,11 +198,16 @@ def parse_item(row):
     item["campos"] = json.loads(item["campos_json"] or "{}")
     item["opcoes"] = []
     item["resumo_fluxo"] = ""
+    item["resumo_transportador"] = ""
     return item
 
 
 def equipamento_nome_exibicao(nome):
-    return "Fluxo" if nome == "Item 1 - Fluxo" else nome
+    if nome == "Item 1 - Fluxo":
+        return "Fluxo"
+    if nome == "Item 2 - Transportadores":
+        return "Transportador"
+    return nome
 
 
 def resumo_fluxo(opcoes):
@@ -219,6 +224,82 @@ def resumo_fluxo(opcoes):
     return f"Fluxo | Tipo: {tipo} | Grãos: {graos} | Impurezas: {impurezas} | Moega: {moega}"
 
 
+def resumo_transportador(campos):
+    tipo = campos.get("tipo_rotulo") or "-"
+    subtipo = campos.get("subtipo_rotulo") or ""
+    equipamento = f"{tipo} {subtipo}".strip()
+    sensores = []
+    acessorios = []
+    for item in campos.get("sensores_acessorios") or []:
+        nome_resumo = item.get("resumo") or item.get("nome") or ""
+        if not nome_resumo:
+            continue
+        if item.get("categoria") == "acessorio":
+            acessorios.append(nome_resumo)
+        else:
+            sensores.append(nome_resumo)
+
+    partes = [f"Transportador | {equipamento}"]
+    if sensores:
+        partes.append(f"Sensores: {', '.join(sensores)}")
+    if acessorios:
+        partes.append(f"Acessórios: {', '.join(acessorios)}")
+    return " | ".join(partes)
+
+
+TRANSPORTADOR_TIPOS = {
+    "redler": "Redler",
+    "correia": "Correia",
+    "hi_flight": "Hi-Flight",
+    "helicoidal": "Helicoidal",
+    "elevador": "Elevador",
+}
+TRANSPORTADOR_SUBTIPOS = {
+    "convencional": "Convencional",
+    "reversivel": "Reversível",
+    "enclausurada": "Enclausurada",
+    "aberta": "Aberta",
+    "aberta_nova": "Aberta Nova",
+}
+TRANSPORTADOR_ITENS = {
+    "sensor_rotacao": {"nome": "Sensor de Rotação", "resumo": "Rotação", "categoria": "sensor"},
+    "sensor_temperatura": {"nome": "Sensor de Temperatura", "resumo": "Temperatura", "categoria": "sensor"},
+    "sensor_embuchamento": {"nome": "Sensor de Embuchamento", "resumo": "Embuchamento", "categoria": "sensor"},
+    "sensor_desalinhamento": {"nome": "Sensor de Desalinhamento", "resumo": "Desalinhamento", "categoria": "sensor"},
+    "janela_alivio_pressao": {"nome": "Janela de Alívio de Pressão", "resumo": "Janela de Alívio", "categoria": "acessorio"},
+    "filtro_pontual": {"nome": "Filtro Pontual", "resumo": "Filtro Pontual", "categoria": "acessorio"},
+    "modulo_alivio_pressao": {"nome": "Módulo de Alívio de Pressão", "resumo": "Módulo de Alívio", "categoria": "acessorio"},
+    "pe_auto_limpante": {"nome": "Pé Auto-Limpante", "resumo": "Pé Auto-Limpante", "categoria": "acessorio"},
+    "plataforma_valvula_2_vias": {
+        "nome": "Plataforma p/ manutenção de válvula 2 vias",
+        "resumo": "Plataforma válvula 2 vias",
+        "categoria": "acessorio",
+    },
+}
+
+
+def collect_transportador_campos(form):
+    tipo = (form.get("transportador_tipo") or "").strip()
+    subtipo = (form.get("transportador_subtipo") or "").strip()
+    selecionados = form.getlist("transportador_item")
+    itens = []
+    for chave in selecionados:
+        definicao = TRANSPORTADOR_ITENS.get(chave)
+        if not definicao:
+            continue
+        item = dict(definicao)
+        item["chave"] = chave
+        item["observacao"] = (form.get(f"transportador_obs__{chave}") or "").strip()
+        itens.append(item)
+    return {
+        "tipo": tipo,
+        "tipo_rotulo": TRANSPORTADOR_TIPOS.get(tipo, tipo),
+        "subtipo": subtipo,
+        "subtipo_rotulo": TRANSPORTADOR_SUBTIPOS.get(subtipo, ""),
+        "sensores_acessorios": itens,
+    }
+
+
 def carregar_opcoes_itens(conn, itens):
     for item in itens:
         opcoes = conn.execute(
@@ -233,6 +314,9 @@ def carregar_opcoes_itens(conn, itens):
         if item["equipamento_nome"] in ("Fluxo", "Item 1 - Fluxo"):
             item["equipamento_nome"] = "Fluxo"
             item["resumo_fluxo"] = resumo_fluxo(item["opcoes"])
+        elif item["equipamento_nome"] in ("Transportador", "Item 2 - Transportadores"):
+            item["equipamento_nome"] = "Transportador"
+            item["resumo_transportador"] = resumo_transportador(item["campos"])
     return itens
 
 
@@ -1363,7 +1447,11 @@ def editar_anteprojeto(
             """
             SELECT
                 id,
-                CASE WHEN nome = 'Item 1 - Fluxo' THEN 'Fluxo' ELSE nome END AS nome,
+                CASE
+                    WHEN nome = 'Item 1 - Fluxo' THEN 'Fluxo'
+                    WHEN nome = 'Item 2 - Transportadores' THEN 'Transportadores'
+                    ELSE nome
+                END AS nome,
                 nome AS cadastro_nome
             FROM equipamentos_modelo
             WHERE parent_id IS NULL AND ativo = 1
@@ -1509,7 +1597,11 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             situacao = "Novo"
         elif situacao not in SITUACAO_REFORMA_OPCOES:
             situacao = "Novo"
-        campos_json = json.dumps(collect_campos(form, schema), ensure_ascii=False)
+        if equipamento["nome"] == "Item 2 - Transportadores":
+            campos = collect_transportador_campos(form)
+        else:
+            campos = collect_campos(form, schema)
+        campos_json = json.dumps(campos, ensure_ascii=False)
         observacao_inicial = (form.get("observacao_inicial") or "").strip()
 
         if item_id:

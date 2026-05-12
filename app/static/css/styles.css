@@ -728,6 +728,49 @@ legend {
   color: var(--primary-dark);
 }
 
+.transport-checklist {
+  display: grid;
+  gap: 10px;
+}
+
+.transport-check-card {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(180px, 1.2fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.transport-check-card button {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.transport-check-card[data-checked="true"] button {
+  background: #edf6f1;
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+  color: var(--primary-dark);
+}
+
+.transport-check-card input:disabled {
+  background: #f3f5f7;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .transport-check-card {
+    grid-template-columns: 1fr;
+  }
+}
+
 .option-check {
   flex-direction: row;
   align-items: center;

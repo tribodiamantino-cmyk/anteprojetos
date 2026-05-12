@@ -188,7 +188,7 @@ def init_db():
         migrate_equipamentos(conn)
         seed_equipamentos(conn)
         ensure_default_equipamentos(conn)
-        prune_equipamentos_to_fluxo(conn)
+        prune_equipamentos_to_default_items(conn)
         seed_admin(conn)
 
 
@@ -376,19 +376,25 @@ def seed_equipamentos(conn):
 
 def ensure_default_equipamentos(conn):
     ensure_item1_fluxo(conn)
+    ensure_item2_transportadores(conn)
 
 
-def prune_equipamentos_to_fluxo(conn):
-    fluxo = conn.execute(
-        "SELECT id FROM equipamentos_modelo WHERE nome = ?",
-        ("Item 1 - Fluxo",),
-    ).fetchone()
-    if not fluxo:
+def prune_equipamentos_to_default_items(conn):
+    permitidos = conn.execute(
+        """
+        SELECT id FROM equipamentos_modelo
+        WHERE nome IN (?, ?)
+        """,
+        ("Item 1 - Fluxo", "Item 2 - Transportadores"),
+    ).fetchall()
+    permitidos_ids = [row["id"] for row in permitidos]
+    if not permitidos_ids:
         return
 
+    permitidos_placeholders = ",".join("?" for _ in permitidos_ids)
     removidos = conn.execute(
-        "SELECT id FROM equipamentos_modelo WHERE id <> ?",
-        (fluxo["id"],),
+        f"SELECT id FROM equipamentos_modelo WHERE id NOT IN ({permitidos_placeholders})",
+        tuple(permitidos_ids),
     ).fetchall()
     removidos_ids = [row["id"] for row in removidos]
     if not removidos_ids:
@@ -415,7 +421,10 @@ def prune_equipamentos_to_fluxo(conn):
             tuple(item_ids),
         )
 
-    conn.execute("UPDATE equipamentos_modelo SET parent_id = NULL WHERE id <> ?", (fluxo["id"],))
+    conn.execute(
+        f"UPDATE equipamentos_modelo SET parent_id = NULL WHERE id NOT IN ({permitidos_placeholders})",
+        tuple(permitidos_ids),
+    )
     conn.execute(f"DELETE FROM equipamentos_modelo WHERE id IN ({placeholders})", tuple(removidos_ids))
 
 
@@ -534,6 +543,56 @@ def ensure_item1_fluxo(conn):
         """,
         (capacidade_impurezas_id, impurezas_id, "sim"),
     )
+
+
+def ensure_item2_transportadores(conn):
+    nome = "Item 2 - Transportadores"
+    schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
+    equipamento = conn.execute(
+        "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
+        (nome,),
+    ).fetchone()
+
+    if equipamento:
+        conn.execute(
+            """
+            UPDATE equipamentos_modelo
+            SET descricao = ?, categoria = ?, subcategoria = ?, fabricante = ?,
+                modelo = ?, schema_json = ?, ativo = 1,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                "Configuracao de transportadores, sensores e acessorios do anteprojeto.",
+                "Configuracao",
+                "Transportadores",
+                "",
+                "",
+                schema_json,
+                equipamento["id"],
+            ),
+        )
+        return equipamento["id"]
+
+    cur = conn.execute(
+        """
+        INSERT INTO equipamentos_modelo
+        (parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            None,
+            nome,
+            "Configuracao de transportadores, sensores e acessorios do anteprojeto.",
+            "Configuracao",
+            "Transportadores",
+            "",
+            "",
+            schema_json,
+            1,
+        ),
+    )
+    return cur.lastrowid
 
 
 def upsert_opcao_equipamento(

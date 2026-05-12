@@ -235,6 +235,43 @@
   const finalFields = Array.from(form.querySelectorAll("[data-final-fields]"));
   const selectedChain = window.ITEM_EDITANDO_CADEIA || [];
   const selectedOptions = window.ITEM_EDITANDO_OPCOES || {};
+  const selectedCampos = window.ITEM_EDITANDO_CAMPOS || {};
+
+  const transportadorConfig = {
+    tipos: [
+      { value: "redler", label: "Redler", subtipos: [{ value: "convencional", label: "Convencional" }, { value: "reversivel", label: "Reversivel" }] },
+      { value: "correia", label: "Correia", subtipos: [{ value: "enclausurada", label: "Enclausurada" }, { value: "aberta", label: "Aberta" }, { value: "aberta_nova", label: "Aberta Nova" }] },
+      { value: "hi_flight", label: "Hi-Flight", subtipos: [] },
+      { value: "helicoidal", label: "Helicoidal", subtipos: [] },
+      { value: "elevador", label: "Elevador", subtipos: [] },
+    ],
+    itens: {
+      redler: ["sensor_rotacao", "sensor_temperatura", "sensor_embuchamento"],
+      correia: ["sensor_rotacao", "sensor_temperatura", "sensor_embuchamento", "sensor_desalinhamento", "janela_alivio_pressao", "filtro_pontual"],
+      hi_flight: ["sensor_rotacao", "sensor_temperatura", "sensor_embuchamento"],
+      helicoidal: [],
+      elevador: [
+        "sensor_rotacao",
+        "sensor_temperatura",
+        "sensor_embuchamento",
+        "sensor_desalinhamento",
+        "modulo_alivio_pressao",
+        "pe_auto_limpante",
+        "plataforma_valvula_2_vias",
+      ],
+    },
+    detalhes: {
+      sensor_rotacao: { label: "Sensor de Rotação", categoria: "sensor" },
+      sensor_temperatura: { label: "Sensor de Temperatura", categoria: "sensor" },
+      sensor_embuchamento: { label: "Sensor de Embuchamento", categoria: "sensor" },
+      sensor_desalinhamento: { label: "Sensor de Desalinhamento", categoria: "sensor" },
+      janela_alivio_pressao: { label: "Janela de Alívio de Pressão", categoria: "acessorio" },
+      filtro_pontual: { label: "Filtro Pontual", categoria: "acessorio" },
+      modulo_alivio_pressao: { label: "Módulo de Alívio de Pressão", categoria: "acessorio" },
+      pe_auto_limpante: { label: "Pé Auto-Limpante", categoria: "acessorio" },
+      plataforma_valvula_2_vias: { label: "Plataforma p/ manutenção de válvula 2 vias", categoria: "acessorio" },
+    },
+  };
 
   function selectedCadastroNome() {
     const option = selects[0].selectedOptions[0];
@@ -243,6 +280,10 @@
 
   function isFluxoSelected() {
     return selectedCadastroNome() === "Item 1 - Fluxo" || selectedPath()[0] === "Fluxo";
+  }
+
+  function isTransportadorSelected() {
+    return selectedCadastroNome() === "Item 2 - Transportadores" || selectedPath()[0] === "Transportadores";
   }
 
   function setVariationFieldsVisible(visible) {
@@ -407,6 +448,44 @@
     return step;
   }
 
+  function setSelectedEquipment(option) {
+    selects[0].value = option.value;
+    chooseLevel(0).catch(() => {
+      attrsBox.innerHTML = '<p class="muted">Nao foi possivel carregar os dados do equipamento.</p>';
+    });
+  }
+
+  function renderEquipmentPicker() {
+    optionsBox.innerHTML = "";
+    setFinalFieldsVisible(false);
+    const wrap = document.createElement("div");
+    wrap.className = "fluxo-wizard";
+    const title = document.createElement("h3");
+    title.textContent = "Adicionar item";
+    wrap.appendChild(title);
+
+    const step = document.createElement("section");
+    step.className = "fluxo-step";
+    const heading = document.createElement("h4");
+    heading.textContent = "Escolha o item";
+    step.appendChild(heading);
+
+    const grid = document.createElement("div");
+    grid.className = "choice-card-grid";
+    Array.from(selects[0].options)
+      .filter((option) => option.value)
+      .forEach((option) => {
+        grid.appendChild(
+          makeFluxoCard(option.textContent, option.value, false, () => {
+            setSelectedEquipment(option);
+          })
+        );
+      });
+    step.appendChild(grid);
+    wrap.appendChild(step);
+    optionsBox.appendChild(wrap);
+  }
+
   function renderFluxoOptions(options) {
     const optionMap = fluxoOptionByKey(options);
     const tipo = optionMap.tipo_fluxo;
@@ -526,15 +605,181 @@
     rerender();
   }
 
-  function renderOptions(options) {
-    optionsBox.innerHTML = "";
-    if (!options.length) {
-      optionsBox.innerHTML = '<p class="muted">Nenhuma configuracao cadastrada para este item.</p>';
-      return;
+  function transportadorTipo(value) {
+    return transportadorConfig.tipos.find((tipo) => tipo.value === value);
+  }
+
+  function transportadorCamposIniciais() {
+    const sensores = selectedCampos.sensores_acessorios || [];
+    return {
+      tipo: selectedCampos.tipo || "",
+      subtipo: selectedCampos.subtipo || "",
+      itens: sensores.map((item) => item.chave).filter(Boolean),
+      obs: sensores.reduce((map, item) => {
+        if (item.chave) map[item.chave] = item.observacao || "";
+        return map;
+      }, {}),
+    };
+  }
+
+  function hiddenInput(name, value) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value || "";
+    return input;
+  }
+
+  function renderTransportadorOptions() {
+    const state = transportadorCamposIniciais();
+
+    function tipoCompleto() {
+      const tipo = transportadorTipo(state.tipo);
+      if (!tipo) return false;
+      return !tipo.subtipos.length || Boolean(state.subtipo);
     }
 
+    function isComplete() {
+      return Boolean(state.tipo && tipoCompleto());
+    }
+
+    function cleanIncompatibleItems() {
+      const permitidos = new Set(transportadorConfig.itens[state.tipo] || []);
+      state.itens = state.itens.filter((item) => permitidos.has(item));
+      Object.keys(state.obs).forEach((key) => {
+        if (!permitidos.has(key)) delete state.obs[key];
+      });
+    }
+
+    function renderHiddenFields(container) {
+      container.appendChild(hiddenInput("transportador_tipo", state.tipo));
+      container.appendChild(hiddenInput("transportador_subtipo", state.subtipo));
+      state.itens.forEach((item) => {
+        container.appendChild(hiddenInput("transportador_item", item));
+        container.appendChild(hiddenInput(`transportador_obs__${item}`, state.obs[item] || ""));
+      });
+    }
+
+    function renderStep(titleText, choices, currentValue, onChange) {
+      const step = document.createElement("section");
+      step.className = "fluxo-step";
+      const title = document.createElement("h4");
+      title.textContent = titleText;
+      step.appendChild(title);
+      const grid = document.createElement("div");
+      grid.className = "choice-card-grid";
+      choices.forEach((choice) => {
+        grid.appendChild(makeFluxoCard(choice.label, choice.value, currentValue === choice.value, () => onChange(choice.value)));
+      });
+      step.appendChild(grid);
+      return step;
+    }
+
+    function renderChecklist() {
+      const step = document.createElement("section");
+      step.className = "fluxo-step";
+      const title = document.createElement("h4");
+      title.textContent = "Sensores e acessórios compatíveis";
+      step.appendChild(title);
+      const itens = transportadorConfig.itens[state.tipo] || [];
+      if (!itens.length) {
+        const empty = document.createElement("p");
+        empty.className = "muted";
+        empty.textContent = "Nenhum sensor/acessório por enquanto.";
+        step.appendChild(empty);
+        return step;
+      }
+      const list = document.createElement("div");
+      list.className = "transport-checklist";
+      itens.forEach((key) => {
+        const detail = transportadorConfig.detalhes[key];
+        const row = document.createElement("div");
+        row.className = "transport-check-card";
+        row.dataset.checked = state.itens.includes(key) ? "true" : "false";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = detail.label;
+        button.addEventListener("click", () => {
+          if (state.itens.includes(key)) {
+            state.itens = state.itens.filter((item) => item !== key);
+            delete state.obs[key];
+          } else {
+            state.itens.push(key);
+          }
+          rerender();
+        });
+        const obs = document.createElement("input");
+        obs.placeholder = "Observação";
+        obs.value = state.obs[key] || "";
+        obs.disabled = !state.itens.includes(key);
+        obs.addEventListener("input", () => {
+          state.obs[key] = obs.value;
+          const hiddenObs = optionsBox.querySelector(`[name="transportador_obs__${key}"]`);
+          if (hiddenObs) hiddenObs.value = obs.value;
+        });
+        row.appendChild(button);
+        row.appendChild(obs);
+        list.appendChild(row);
+      });
+      step.appendChild(list);
+      return step;
+    }
+
+    function rerender() {
+      cleanIncompatibleItems();
+      optionsBox.innerHTML = "";
+      setFinalFieldsVisible(isComplete());
+      const wrap = document.createElement("div");
+      wrap.className = "fluxo-wizard";
+      const title = document.createElement("h3");
+      title.textContent = "Adicionar Transportador";
+      wrap.appendChild(title);
+      renderHiddenFields(wrap);
+
+      wrap.appendChild(
+        renderStep("Etapa 1 - Tipo de Transportador", transportadorConfig.tipos, state.tipo, (value) => {
+          state.tipo = value;
+          state.subtipo = "";
+          state.itens = [];
+          state.obs = {};
+          rerender();
+        })
+      );
+
+      const tipo = transportadorTipo(state.tipo);
+      if (tipo && tipo.subtipos.length) {
+        wrap.appendChild(
+          renderStep("Etapa 2 - Subtipo", tipo.subtipos, state.subtipo, (value) => {
+            state.subtipo = value;
+            state.itens = [];
+            state.obs = {};
+            rerender();
+          })
+        );
+      }
+
+      if (state.tipo && tipoCompleto()) {
+        wrap.appendChild(renderChecklist());
+      }
+
+      optionsBox.appendChild(wrap);
+    }
+
+    rerender();
+  }
+
+  function renderOptions(options) {
+    optionsBox.innerHTML = "";
     if (isFluxoSelected()) {
       renderFluxoOptions(options);
+      return;
+    }
+    if (isTransportadorSelected()) {
+      renderTransportadorOptions();
+      return;
+    }
+    if (!options.length) {
+      optionsBox.innerHTML = '<p class="muted">Nenhuma configuracao cadastrada para este item.</p>';
       return;
     }
 
@@ -703,6 +948,16 @@
       return;
     }
 
+    if (level === 0 && isTransportadorSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedId;
+      pathBox.textContent = "Transportadores";
+      attrsBox.innerHTML = "";
+      await loadOptions(selectedId);
+      return;
+    }
+
     setVariationFieldsVisible(true);
     setFinalFieldsVisible(true);
     const children = await loadChildren(level, selectedId);
@@ -728,12 +983,12 @@
       attrsBox.innerHTML = '<p class="muted">Selecione o modelo final antes de adicionar ao anteprojeto.</p>';
       return;
     }
-    if (isFluxoSelected() && finalFields.some((element) => element.hidden)) {
+    if ((isFluxoSelected() || isTransportadorSelected()) && finalFields.some((element) => element.hidden)) {
       event.preventDefault();
       attrsBox.innerHTML = "";
       const alert = document.createElement("p");
       alert.className = "muted";
-      alert.textContent = "Complete todas as etapas do Fluxo antes de adicionar ao anteprojeto.";
+      alert.textContent = "Complete todas as etapas antes de adicionar ao anteprojeto.";
       optionsBox.appendChild(alert);
     }
   });
@@ -746,6 +1001,15 @@
       setFinalFieldsVisible(false);
       finalInput.value = selectedChain[0].id;
       pathBox.textContent = "Fluxo";
+      attrsBox.innerHTML = "";
+      await loadOptions(finalInput.value);
+      return;
+    }
+    if (isTransportadorSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedChain[0].id;
+      pathBox.textContent = "Transportadores";
       attrsBox.innerHTML = "";
       await loadOptions(finalInput.value);
       return;
@@ -776,10 +1040,12 @@
       return;
     }
     const realOptions = Array.from(selects[0].options).filter((option) => option.value);
-    if (realOptions.length === 1 && realOptions[0].dataset.cadastroNome === "Item 1 - Fluxo") {
+    if (realOptions.length === 1) {
       selects[0].value = realOptions[0].value;
       await chooseLevel(0);
+      return;
     }
+    renderEquipmentPicker();
   }
 
   preloadInitialState().catch(() => {});

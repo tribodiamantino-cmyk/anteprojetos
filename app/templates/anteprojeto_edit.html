@@ -142,7 +142,7 @@
           <div>
             <h3>{{ item.equipamento_nome }}</h3>
             <p>{{ item.quantidade }} un. - {{ item.situacao }}</p>
-            {% if item.campos %}
+            {% if item.campos and not item.resumo_transportador %}
             <dl class="field-summary">
               {% for nome, valor in item.campos.items() %}
                 {% if valor %}
@@ -157,6 +157,8 @@
             {% if item.observacao_inicial %}<p><strong>Obs. inicial:</strong> {{ item.observacao_inicial }}</p>{% endif %}
             {% if item.resumo_fluxo %}
             <p class="item-summary-line">{{ item.resumo_fluxo }}</p>
+            {% elif item.resumo_transportador %}
+            <p class="item-summary-line">{{ item.resumo_transportador }}</p>
             {% elif item.opcoes %}
             <div class="item-options">
               <strong>Configuracoes:</strong>
