@@ -775,7 +775,6 @@
       const capacityInput = document.createElement("input");
       capacityInput.name = "engenharia_capacidade_desejada";
       capacityInput.type = "text";
-      capacityInput.required = true;
       capacityInput.placeholder = "Ex.: 2.000 Ton, aproximadamente 35.000 sacas, 120 t/h";
       capacityInput.value = selectedCampos.capacidade_desejada || "";
       capacityLabel.appendChild(capacityInput);
