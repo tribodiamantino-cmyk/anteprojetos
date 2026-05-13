@@ -28,6 +28,13 @@ def _p(text, style):
 
 def _format_campos(campos_json):
     campos = json.loads(campos_json or "{}")
+    if campos.get("modo_definicao") == "engenharia":
+        linhas = ["<b>Definição:</b> Engenharia"]
+        if campos.get("capacidade_desejada"):
+            linhas.append(f"<b>Capacidade desejada:</b> {campos['capacidade_desejada']}")
+        if campos.get("observacoes_engenharia"):
+            linhas.append(f"<b>Observações:</b><br/>{campos['observacoes_engenharia']}")
+        return "<br/>".join(linhas)
     linhas = []
     for nome, valor in campos.items():
         if isinstance(valor, list):

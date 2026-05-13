@@ -234,9 +234,13 @@
   const variationLabels = Array.from(form.querySelectorAll("[data-variation-level]"));
   const finalFields = Array.from(form.querySelectorAll("[data-final-fields]"));
   const quantidadeInput = form.querySelector("[data-quantidade-input]");
+  const tipoDefinicaoSelect = form.querySelector('select[name="tipo_definicao"]');
+  const tipoDefinicaoField = form.querySelector("[data-tipo-definicao-field]");
+  const observacaoInicialField = form.querySelector('textarea[name="observacao_inicial"]')?.closest("[data-final-fields]");
   const selectedChain = window.ITEM_EDITANDO_CADEIA || [];
   const selectedOptions = window.ITEM_EDITANDO_OPCOES || {};
   const selectedCampos = window.ITEM_EDITANDO_CAMPOS || {};
+  let definitionMode = selectedCampos.modo_definicao === "engenharia" ? "engenharia" : "";
 
   const transportadorConfig = {
     tipos: [
@@ -510,6 +514,12 @@
         field.disabled = !visible;
       });
     });
+    if (tipoDefinicaoField) {
+      tipoDefinicaoField.hidden = true;
+      tipoDefinicaoField.querySelectorAll("input, select, textarea").forEach((field) => {
+        field.disabled = false;
+      });
+    }
   }
 
   function resetSelect(select, placeholder) {
@@ -685,6 +695,112 @@
     return step;
   }
 
+  function setTipoDefinicaoPorModo(mode) {
+    if (!tipoDefinicaoSelect) return;
+    tipoDefinicaoSelect.value = mode === "engenharia" ? "Engenharia dimensionar" : "Ja definido";
+    tipoDefinicaoSelect.disabled = false;
+  }
+
+  function setEngineeringFinalLayout(active) {
+    if (observacaoInicialField) {
+      observacaoInicialField.hidden = active;
+      observacaoInicialField.querySelectorAll("textarea").forEach((field) => {
+        field.disabled = active;
+      });
+    }
+    if (tipoDefinicaoField) {
+      tipoDefinicaoField.hidden = true;
+    }
+  }
+
+  function clearSelectedTechnicalCampos() {
+    Object.keys(selectedCampos).forEach((key) => {
+      delete selectedCampos[key];
+    });
+  }
+
+  function makeModoDefinicaoPanel(technicalRenderer) {
+    const wrap = document.createElement("div");
+    wrap.className = "fluxo-wizard definicao-mode";
+    const title = document.createElement("h3");
+    title.textContent = "Modo de definição";
+    wrap.appendChild(title);
+
+    const step = document.createElement("section");
+    step.className = "fluxo-step";
+    const grid = document.createElement("div");
+    grid.className = "choice-card-grid";
+    [
+      { value: "definido", label: "Já definido" },
+      { value: "engenharia", label: "Definição da Engenharia" },
+    ].forEach((choice) => {
+      grid.appendChild(makeFluxoCard(choice.label, choice.value, definitionMode === choice.value, () => {
+        definitionMode = choice.value;
+        if (choice.value === "engenharia") {
+          clearSelectedTechnicalCampos();
+        }
+        renderModoDefinicao(technicalRenderer);
+      }));
+    });
+    step.appendChild(grid);
+    wrap.appendChild(step);
+    return wrap;
+  }
+
+  function renderModoDefinicao(technicalRenderer) {
+    if (definitionMode === "definido") {
+      setTipoDefinicaoPorModo("definido");
+      setEngineeringFinalLayout(false);
+      technicalRenderer();
+      optionsBox.prepend(makeModoDefinicaoPanel(technicalRenderer));
+      return;
+    }
+
+    optionsBox.innerHTML = "";
+    setFinalFieldsVisible(definitionMode === "engenharia");
+    setEngineeringFinalLayout(definitionMode === "engenharia");
+    if (definitionMode === "engenharia") {
+      setTipoDefinicaoPorModo("engenharia");
+    }
+
+    const wrap = makeModoDefinicaoPanel(technicalRenderer);
+
+    if (definitionMode === "engenharia") {
+      wrap.appendChild(hiddenInput("definicao_modo", "engenharia"));
+
+      const capacity = document.createElement("section");
+      capacity.className = "fluxo-step";
+      const capacityLabel = document.createElement("label");
+      capacityLabel.textContent = "Capacidade desejada";
+      const capacityInput = document.createElement("input");
+      capacityInput.name = "engenharia_capacidade_desejada";
+      capacityInput.type = "text";
+      capacityInput.required = true;
+      capacityInput.placeholder = "Ex.: 2.000 Ton, aproximadamente 35.000 sacas, 120 t/h";
+      capacityInput.value = selectedCampos.capacidade_desejada || "";
+      capacityLabel.appendChild(capacityInput);
+      capacity.appendChild(capacityLabel);
+      wrap.appendChild(capacity);
+
+      const notes = document.createElement("section");
+      notes.className = "fluxo-step";
+      const notesLabel = document.createElement("label");
+      notesLabel.textContent = "Observações para engenharia";
+      const notesInput = document.createElement("textarea");
+      notesInput.name = "engenharia_observacoes";
+      notesInput.rows = 4;
+      notesInput.placeholder = "Ex.: Cliente deseja solução compacta";
+      notesInput.value = selectedCampos.observacoes_engenharia || "";
+      notesLabel.appendChild(notesInput);
+      notes.appendChild(notesLabel);
+      wrap.appendChild(notes);
+    } else {
+      setTipoDefinicaoPorModo("definido");
+    }
+
+    optionsBox.appendChild(wrap);
+  }
+
   function canalizacaoFluxo(valor) {
     const fluxo = Number(String(valor || "").replace(",", "."));
     if (!fluxo) return "";
@@ -709,6 +825,7 @@
   }
 
   function setSelectedEquipment(option) {
+    definitionMode = "";
     selects[0].value = option.value;
     chooseLevel(0).catch(() => {
       attrsBox.innerHTML = '<p class="muted">Nao foi possivel carregar os dados do equipamento.</p>';
@@ -1788,31 +1905,31 @@
   function renderOptions(options) {
     optionsBox.innerHTML = "";
     if (isFluxoSelected()) {
-      renderFluxoOptions(options);
+      renderModoDefinicao(() => renderFluxoOptions(options));
       return;
     }
     if (isTransportadorSelected()) {
-      renderTransportadorOptions();
+      renderModoDefinicao(renderTransportadorOptions);
       return;
     }
     if (isMaquinaLimpezaSelected()) {
-      renderMaquinaLimpezaOptions();
+      renderModoDefinicao(renderMaquinaLimpezaOptions);
       return;
     }
     if (isSecadorSelected()) {
-      renderSecadorOptions();
+      renderModoDefinicao(renderSecadorOptions);
       return;
     }
     if (isSiloPulmaoSelected()) {
-      renderSiloPulmaoOptions();
+      renderModoDefinicao(renderSiloPulmaoOptions);
       return;
     }
     if (isSiloFundoPlanoSelected()) {
-      renderSiloFundoPlanoOptions();
+      renderModoDefinicao(renderSiloFundoPlanoOptions);
       return;
     }
     if (isExpedicaoSelected()) {
-      renderExpedicaoOptions();
+      renderModoDefinicao(renderExpedicaoOptions);
       return;
     }
     if (!options.length) {

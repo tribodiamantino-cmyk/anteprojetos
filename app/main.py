@@ -197,6 +197,7 @@ def parse_item(row):
     item = dict(row)
     item["campos"] = json.loads(item["campos_json"] or "{}")
     item["opcoes"] = []
+    item["resumo_engenharia"] = ""
     item["resumo_fluxo"] = ""
     item["resumo_transportador"] = ""
     item["resumo_maquina_limpeza"] = ""
@@ -223,6 +224,24 @@ def equipamento_nome_exibicao(nome):
     if nome == "Item 7 - Expedição":
         return "Expedição"
     return nome
+
+
+def collect_engenharia_campos(form):
+    return {
+        "modo_definicao": "engenharia",
+        "capacidade_desejada": (form.get("engenharia_capacidade_desejada") or "").strip(),
+        "observacoes_engenharia": (form.get("engenharia_observacoes") or "").strip(),
+    }
+
+
+def resumo_engenharia(item):
+    campos = item.get("campos") or {}
+    partes = [item.get("equipamento_nome") or "Equipamento", "Definição da Engenharia"]
+    if campos.get("capacidade_desejada"):
+        partes.append(f"Capacidade desejada: {campos['capacidade_desejada']}")
+    if campos.get("observacoes_engenharia"):
+        partes.append(f"Observações: {campos['observacoes_engenharia']}")
+    return " | ".join(partes)
 
 
 def canalizacao_fluxo(valor_fluxo):
@@ -684,7 +703,10 @@ def carregar_opcoes_itens(conn, itens):
             (item["id"],),
         ).fetchall()
         item["opcoes"] = [dict(opcao) for opcao in opcoes]
-        if item["equipamento_nome"] in ("Fluxo", "Item 1 - Fluxo"):
+        if item["campos"].get("modo_definicao") == "engenharia":
+            item["equipamento_nome"] = equipamento_nome_exibicao(item["equipamento_nome"])
+            item["resumo_engenharia"] = resumo_engenharia(item)
+        elif item["equipamento_nome"] in ("Fluxo", "Item 1 - Fluxo"):
             item["equipamento_nome"] = "Fluxo"
             item["opcoes"] = aplicar_canalizacao_fluxo(item["opcoes"])
             item["resumo_fluxo"] = resumo_fluxo(item["opcoes"])
@@ -1988,13 +2010,18 @@ async def salvar_item(request: Request, anteprojeto_id: int):
         schema = json.loads(equipamento["schema_json"])
         caminho_equipamento = equipamento_nome_exibicao(obter_caminho_equipamento(conn, equipamento_id))
         quantidade = int(form.get("quantidade") or 1)
+        modo_definicao = (form.get("definicao_modo") or "").strip()
         tipo_definicao = form.get("tipo_definicao") or "Engenharia dimensionar"
+        if modo_definicao == "engenharia":
+            tipo_definicao = "Engenharia dimensionar"
         situacao = form.get("situacao") or "Novo"
         if anteprojeto["tipo_obra"] == "Obra nova":
             situacao = "Novo"
         elif situacao not in SITUACAO_REFORMA_OPCOES:
             situacao = "Novo"
-        if equipamento["nome"] == "Item 2 - Transportadores":
+        if modo_definicao == "engenharia":
+            campos = collect_engenharia_campos(form)
+        elif equipamento["nome"] == "Item 2 - Transportadores":
             campos = collect_transportador_campos(form)
         elif equipamento["nome"] == "Item 3 - Máquina de Limpeza Grain Cleaner EC":
             campos = collect_maquina_limpeza_campos(form)
@@ -2042,7 +2069,10 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 "INSERT INTO historico_item (item_id, descricao) VALUES (?, ?)",
                 (item_id, "Item editado"),
             )
-            salvar_opcoes_item(conn, int(item_id), equipamento_id, form)
+            if modo_definicao == "engenharia":
+                conn.execute("DELETE FROM itens_anteprojeto_opcoes WHERE item_anteprojeto_id = ?", (int(item_id),))
+            else:
+                salvar_opcoes_item(conn, int(item_id), equipamento_id, form)
             registrar_historico_anteprojeto(
                 conn,
                 anteprojeto_id,
@@ -2074,7 +2104,8 @@ async def salvar_item(request: Request, anteprojeto_id: int):
                 "INSERT INTO historico_item (item_id, descricao) VALUES (?, ?)",
                 (cur.lastrowid, "Item adicionado"),
             )
-            salvar_opcoes_item(conn, cur.lastrowid, equipamento_id, form)
+            if modo_definicao != "engenharia":
+                salvar_opcoes_item(conn, cur.lastrowid, equipamento_id, form)
             registrar_historico_anteprojeto(
                 conn,
                 anteprojeto_id,
