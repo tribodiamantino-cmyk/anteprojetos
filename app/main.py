@@ -2291,7 +2291,7 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             )
         touch_anteprojeto(conn, anteprojeto_id)
 
-    return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
+    return RedirectResponse(f"/anteprojetos/{anteprojeto_id}#adicionar-item", status_code=303)
 
 
 @app.post("/anteprojetos/{anteprojeto_id}/itens/{item_id}/retorno")
