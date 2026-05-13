@@ -2362,6 +2362,12 @@ def pdf_anteprojeto(request: Request, anteprojeto_id: int):
         return usuario
     with get_conn() as conn:
         anteprojeto = get_anteprojeto_or_404(conn, anteprojeto_id)
+        itens = conn.execute(
+            "SELECT * FROM itens_anteprojeto WHERE anteprojeto_id = ? ORDER BY equipamento_nome, id",
+            (anteprojeto_id,),
+        ).fetchall()
+        itens = carregar_opcoes_itens(conn, [parse_item(item) for item in itens])
+        relatorio = preparar_relatorio_anteprojeto(anteprojeto, itens)
         criar_versao_anteprojeto(conn, anteprojeto_id, usuario, "Geracao de relatorio final")
         registrar_historico_anteprojeto(
             conn,
@@ -2370,12 +2376,6 @@ def pdf_anteprojeto(request: Request, anteprojeto_id: int):
             "pdf_final",
             "Relatório final gerado",
         )
-        itens = conn.execute(
-            "SELECT * FROM itens_anteprojeto WHERE anteprojeto_id = ? ORDER BY equipamento_nome, id",
-            (anteprojeto_id,),
-        ).fetchall()
-        itens = carregar_opcoes_itens(conn, [dict(item) for item in itens])
-        relatorio = preparar_relatorio_anteprojeto(anteprojeto, itens)
 
     return templates.TemplateResponse(
         "anteprojeto_relatorio.html",
