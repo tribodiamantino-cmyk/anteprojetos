@@ -426,11 +426,11 @@
     escadas: siloPulmaoConfig.escadas,
     extras: siloPulmaoConfig.extras,
     roscas: [
-      { value: "nao", label: "NÃ£o" },
+      { value: "nao", label: "Não" },
       { value: "standard", label: "Standard" },
-      { value: "modulo_avanco", label: "Com mÃ³dulo de avanÃ§o" },
-      { value: "painel_automatico", label: "Com painel automÃ¡tico" },
-      { value: "automatica_zero_entrada", label: "AutomÃ¡tica zero entrada" },
+      { value: "modulo_avanco", label: "Com módulo de avanço" },
+      { value: "painel_automatico", label: "Com painel automático" },
+      { value: "automatica_zero_entrada", label: "Automática zero entrada" },
     ],
   };
 
@@ -1359,6 +1359,7 @@
       aeracao: selectedCampos.aeracao || "",
       taxa: selectedCampos.aeracao_taxa || "",
       escada: selectedCampos.escada || "",
+      alternarEscadas: selectedCampos.alternar_escadas || "",
       extras: (selectedCampos.escada_extras || []).map((item) => item.chave).filter(Boolean),
       rosca: selectedCampos.rosca_varredora || "",
       espalhador: selectedCampos.espalhador_graos || "",
@@ -1380,6 +1381,7 @@
       state.aeracao = "";
       state.taxa = "";
       state.escada = "";
+      state.alternarEscadas = "";
       state.extras = [];
       state.rosca = "";
       state.espalhador = "";
@@ -1390,6 +1392,7 @@
       state.aeracao = "";
       state.taxa = "";
       state.escada = "";
+      state.alternarEscadas = "";
       state.extras = [];
       state.rosca = "";
       state.espalhador = "";
@@ -1398,6 +1401,7 @@
       state.aeracao = "";
       state.taxa = "";
       state.escada = "";
+      state.alternarEscadas = "";
       state.extras = [];
       state.rosca = "";
       state.espalhador = "";
@@ -1405,6 +1409,7 @@
     const resetAfterAeracao = () => {
       state.taxa = "";
       state.escada = "";
+      state.alternarEscadas = "";
       state.extras = [];
       state.rosca = "";
       state.espalhador = "";
@@ -1435,6 +1440,7 @@
       container.appendChild(hiddenInput("silo_aeracao", state.aeracao));
       container.appendChild(hiddenInput("silo_aeracao_taxa", state.taxa));
       container.appendChild(hiddenInput("silo_escada", state.escada));
+      container.appendChild(hiddenInput("silo_alternar_escadas", state.alternarEscadas));
       state.extras.forEach((extra) => container.appendChild(hiddenInput("silo_escada_extra", extra)));
       container.appendChild(hiddenInput("silo_fp_rosca_varredora", state.rosca));
       container.appendChild(hiddenInput("silo_fp_espalhador_graos", state.espalhador));
@@ -1462,7 +1468,7 @@
         rerender();
       });
       button.classList.add("silo-card");
-      button.innerHTML = `<strong>${silo.d} ft | ${silo.a} anÃ©is</strong><span>${fmt(silo.ton)} Ton</span><span>${fmt(silo.sacas)} scs</span>`;
+      button.innerHTML = `<strong>${silo.d} ft | ${silo.a} anéis</strong><span>${fmt(silo.ton)} Ton</span><span>${fmt(silo.sacas)} scs</span>`;
       return button;
     }
 
@@ -1471,7 +1477,7 @@
         const step = document.createElement("section");
         step.className = "fluxo-step";
         const title = document.createElement("h4");
-        title.textContent = "Etapa 3 - AnÃ©is";
+        title.textContent = "Etapa 3 - Anéis";
         step.appendChild(title);
         const grid = document.createElement("div");
         grid.className = "choice-card-grid";
@@ -1543,11 +1549,11 @@
       wrap.appendChild(title);
       renderHiddenFields(wrap);
 
-      wrap.appendChild(renderStep("Etapa 1 - Modo de SeleÃ§Ã£o", [{ value: "diametro", label: "Selecionar por DiÃ¢metro" }, { value: "capacidade", label: "Selecionar por Capacidade" }], state.modo, (value) => {
+      wrap.appendChild(renderStep("Etapa 1 - Modo de Seleção", [{ value: "diametro", label: "Selecionar por Diâmetro" }, { value: "capacidade", label: "Selecionar por Capacidade" }], state.modo, (value) => {
         state.modo = value; state.diametro = ""; state.capacidadeTipo = ""; state.capacidadeDesejada = ""; state.silo = null; resetAccessories(); rerender();
       }));
       if (state.modo === "diametro") {
-        wrap.appendChild(renderStep("Etapa 2 - DiÃ¢metro (ft)", siloFundoPlanoConfig.diametros.map((d) => ({ value: String(d), label: String(d) })), state.diametro, (value) => {
+        wrap.appendChild(renderStep("Etapa 2 - Diâmetro (ft)", siloFundoPlanoConfig.diametros.map((d) => ({ value: String(d), label: String(d) })), state.diametro, (value) => {
           state.diametro = value; state.silo = null; resetAccessories(); rerender();
         }));
       }
@@ -1559,13 +1565,27 @@
       renderSiloChoices(wrap);
       if (state.silo) wrap.appendChild(renderStep("Termometria", siloFundoPlanoConfig.termometrias, state.termometria, (value) => { state.termometria = value; resetAfterTermometria(); rerender(); }));
       if (state.termometria && state.termometria !== "sem") wrap.appendChild(renderStep("Pacote", siloFundoPlanoConfig.pacotes, state.pacote, (value) => { state.pacote = value; rerender(); }));
-      if (state.termometria === "sem" || state.pacote) wrap.appendChild(renderStep("Sensor de NÃ­vel", siloFundoPlanoConfig.simNao, state.sensorNivel, (value) => { state.sensorNivel = value; resetAfterSensor(); rerender(); }));
-      if (state.sensorNivel) wrap.appendChild(renderStep("AeraÃ§Ã£o", siloFundoPlanoConfig.simNao, state.aeracao, (value) => { state.aeracao = value; resetAfterAeracao(); rerender(); }));
-      if (state.aeracao === "sim") wrap.appendChild(renderStep("Taxa de AeraÃ§Ã£o", siloFundoPlanoConfig.taxas, state.taxa, (value) => { state.taxa = value; state.escada = ""; state.extras = []; state.rosca = ""; state.espalhador = ""; rerender(); }));
-      if (state.aeracao === "nao" || state.taxa) wrap.appendChild(renderStep("Tipo de Escada", siloFundoPlanoConfig.escadas, state.escada, (value) => { state.escada = value; state.extras = []; state.rosca = ""; state.espalhador = ""; rerender(); }));
+      if (state.termometria === "sem" || state.pacote) wrap.appendChild(renderStep("Sensor de Nível", siloFundoPlanoConfig.simNao, state.sensorNivel, (value) => { state.sensorNivel = value; resetAfterSensor(); rerender(); }));
+      if (state.sensorNivel) wrap.appendChild(renderStep("Aeração", siloFundoPlanoConfig.simNao, state.aeracao, (value) => { state.aeracao = value; resetAfterAeracao(); rerender(); }));
+      if (state.aeracao === "sim") wrap.appendChild(renderStep("Taxa de Aeração", siloFundoPlanoConfig.taxas, state.taxa, (value) => { state.taxa = value; state.escada = ""; state.alternarEscadas = ""; state.extras = []; state.rosca = ""; state.espalhador = ""; rerender(); }));
+      if (state.aeracao === "nao" || state.taxa) wrap.appendChild(renderStep("Tipo de Escada", siloFundoPlanoConfig.escadas, state.escada, (value) => { state.escada = value; state.alternarEscadas = ""; state.extras = []; state.rosca = ""; state.espalhador = ""; rerender(); }));
+      const quantidade = Number(quantidadeInput ? quantidadeInput.value : 1);
+      if (quantidade <= 1) {
+        state.alternarEscadas = "";
+      }
+      if (state.escada && quantidade > 1 && !state.alternarEscadas) {
+        setTimeout(() => {
+          if (isSiloFundoPlanoSelected() && Number(quantidadeInput ? quantidadeInput.value : 1) > 1 && !state.alternarEscadas) {
+            askAlternarEscadas((value) => {
+              state.alternarEscadas = value;
+              rerender();
+            });
+          }
+        }, 0);
+      }
       if (state.escada) renderExtraCards(wrap);
       if (state.escada) wrap.appendChild(renderStep("Rosca Varredora", siloFundoPlanoConfig.roscas, state.rosca, (value) => { state.rosca = value; state.espalhador = ""; rerender(); }));
-      if (state.rosca) wrap.appendChild(renderStep("Espalhador de grÃ£os", siloFundoPlanoConfig.simNao, state.espalhador, (value) => { state.espalhador = value; rerender(); }));
+      if (state.rosca) wrap.appendChild(renderStep("Espalhador de grãos", siloFundoPlanoConfig.simNao, state.espalhador, (value) => { state.espalhador = value; rerender(); }));
       optionsBox.appendChild(wrap);
     }
 
