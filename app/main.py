@@ -1,9 +1,10 @@
 ﻿import json
 import os
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -19,9 +20,6 @@ from .db import (
     registrar_historico_anteprojeto,
     touch_anteprojeto,
 )
-from .pdf import gerar_pdf_anteprojeto
-
-
 app = FastAPI(title="Anteprojetos de Armazenagem Agricola")
 app.add_middleware(
     SessionMiddleware,
@@ -744,6 +742,176 @@ def opcoes_item_map(conn, item_id):
         (item_id,),
     ).fetchall()
     return {str(opcao["opcao_id"]): {"valor": opcao["valor"], "valor_rotulo": opcao["valor_rotulo"]} for opcao in opcoes}
+
+
+def item_modo_relatorio(item):
+    if (item.get("campos") or {}).get("modo_definicao") == "engenharia" or item.get("tipo_definicao") == "Engenharia dimensionar":
+        return "Definição da Engenharia"
+    return "Já definido"
+
+
+def detalhes_relatorio_item(item):
+    campos = item.get("campos") or {}
+    if campos.get("modo_definicao") == "engenharia":
+        detalhes = []
+        if campos.get("capacidade_desejada"):
+            detalhes.append(("Capacidade desejada", campos["capacidade_desejada"]))
+        if campos.get("observacoes_engenharia"):
+            detalhes.append(("Observações", campos["observacoes_engenharia"]))
+        return detalhes
+
+    nome = item.get("equipamento_nome") or ""
+    detalhes = []
+    if nome == "Fluxo":
+        for opcao in item.get("opcoes") or []:
+            valor = opcao.get("valor_rotulo") or opcao.get("valor")
+            if valor:
+                detalhes.append((opcao.get("opcao_nome") or "Opção", valor))
+        return detalhes
+
+    if nome == "Transportador":
+        equipamento = " ".join(part for part in [campos.get("tipo_rotulo"), campos.get("subtipo_rotulo")] if part)
+        if equipamento:
+            detalhes.append(("Equipamento", equipamento))
+        itens = campos.get("sensores_acessorios") or []
+        sensores = [item_sensor.get("nome") for item_sensor in itens if item_sensor.get("categoria") != "acessorio"]
+        acessorios = [item_sensor.get("nome") for item_sensor in itens if item_sensor.get("categoria") == "acessorio"]
+        if sensores:
+            detalhes.append(("Sensores", ", ".join(sensores)))
+        if acessorios:
+            detalhes.append(("Acessórios", ", ".join(acessorios)))
+        return detalhes
+
+    if nome == "Máquina de Limpeza Grain Cleaner EC":
+        detalhes.append(("Tipo de limpeza", campos.get("tipo_limpeza_rotulo")))
+        detalhes.append(("Modelo", campos.get("modelo_rotulo")))
+        return [(k, v) for k, v in detalhes if v]
+
+    if nome == "Secador Process Dryer":
+        detalhes.append(("Modelo", campos.get("modelo_rotulo")))
+        if campos.get("fornalha") == "com":
+            detalhes.append(("Fornalha Black Velox", campos.get("combustivel_rotulo")))
+        else:
+            detalhes.append(("Fornalha", "Sem Fornalha"))
+        if campos.get("alimentador") == "com":
+            detalhes.append(("Alimentador de Cavaco", campos.get("alimentador_volume_rotulo")))
+        else:
+            detalhes.append(("Alimentador", "Sem Alimentador"))
+        return [(k, v) for k, v in detalhes if v]
+
+    if nome in ("Silo Pulmão Elevado", "Silo Fundo Plano"):
+        if campos.get("diametro") and campos.get("aneis"):
+            detalhes.append(("Modelo", f"{campos.get('diametro')} ft / {campos.get('aneis')} anéis"))
+        if campos.get("ton"):
+            capacidade = f"{campos.get('ton')} Ton"
+            if campos.get("sacas"):
+                capacidade = f"{capacidade} / {campos.get('sacas')} scs"
+            detalhes.append(("Capacidade", capacidade))
+        if campos.get("termometria") and campos.get("termometria") != "sem":
+            termometria = campos.get("termometria_rotulo")
+            if campos.get("termometria_pacote_rotulo"):
+                termometria = f"{termometria} - {campos.get('termometria_pacote_rotulo')}"
+            detalhes.append(("Termometria", termometria))
+        if campos.get("sensor_nivel"):
+            detalhes.append(("Sensor de nível", "Sim" if campos.get("sensor_nivel") == "sim" else "Não"))
+        if campos.get("aeracao") == "sim":
+            detalhes.append(("Aeração", campos.get("aeracao_taxa")))
+        elif campos.get("aeracao") == "nao":
+            detalhes.append(("Aeração", "Não"))
+        if campos.get("escada_rotulo"):
+            detalhes.append(("Escada", campos.get("escada_rotulo")))
+        extras = [extra.get("rotulo") for extra in campos.get("escada_extras") or [] if extra.get("rotulo")]
+        if extras:
+            detalhes.append(("Acessórios", ", ".join(extras)))
+        if nome == "Silo Fundo Plano":
+            if campos.get("rosca_varredora_rotulo"):
+                detalhes.append(("Rosca Varredora", campos.get("rosca_varredora_rotulo")))
+            if campos.get("espalhador_graos"):
+                detalhes.append(("Espalhador de grãos", "Sim" if campos.get("espalhador_graos") == "sim" else "Não"))
+        return [(k, v) for k, v in detalhes if v]
+
+    if nome == "Expedição":
+        if campos.get("tipo_rotulo"):
+            detalhes.append(("Tipo", campos.get("tipo_rotulo")))
+        if campos.get("tipo") == "silo":
+            detalhes.append(("Modelo", f"15 ft / {campos.get('aneis')} anéis"))
+            detalhes.append(("Capacidade", f"{campos.get('ton')} Ton / {campos.get('sacas')} scs"))
+            detalhes.append(("Estrutura metálica", campos.get("estrutura_rotulo")))
+            if campos.get("suporte_balanca") == "sim":
+                detalhes.append(("Suporte para balança", campos.get("suporte_balanca_descricao") or "Sim"))
+        elif campos.get("tipo") == "tulha":
+            detalhes.append(("Modelo", f"{campos.get('volume')} / {campos.get('modulos')}"))
+            detalhes.append(("Capacidade", f"{campos.get('ton')} Ton"))
+        if campos.get("sensor_nivel"):
+            detalhes.append(("Sensor de nível", "Sim" if campos.get("sensor_nivel") == "sim" else "Não"))
+        if campos.get("escada_rotulo"):
+            detalhes.append(("Escada", campos.get("escada_rotulo")))
+        return [(k, v) for k, v in detalhes if v]
+
+    for chave, valor in campos.items():
+        if valor not in ("", None, []):
+            detalhes.append((chave.replace("_", " ").title(), valor))
+    return detalhes
+
+
+def observacoes_automaticas(itens):
+    observacoes = []
+    for item in itens:
+        if item.get("equipamento_nome") != "Fluxo":
+            continue
+        dados = {opcao.get("opcao_chave"): opcao for opcao in item.get("opcoes") or []}
+        fluxo = dados.get("fluxo_graos", {}).get("valor_rotulo") or dados.get("fluxo_graos", {}).get("valor")
+        canalizacao = dados.get("canalizacao_sugerida", {}).get("valor_rotulo") or dados.get("canalizacao_sugerida", {}).get("valor")
+        if fluxo and canalizacao:
+            observacoes.append(f"Canalização sugerida para fluxo de {fluxo}: {canalizacao}")
+    return observacoes
+
+
+def preparar_relatorio_anteprojeto(anteprojeto, itens):
+    grupos_ordem = [
+        "Fluxo",
+        "Transportador",
+        "Máquina de Limpeza Grain Cleaner EC",
+        "Secador Process Dryer",
+        "Silo Pulmão Elevado",
+        "Silo Fundo Plano",
+        "Expedição",
+    ]
+    grupos_titulos = {
+        "Transportador": "Transportadores",
+        "Máquina de Limpeza Grain Cleaner EC": "Máquinas de Limpeza",
+        "Secador Process Dryer": "Secadores",
+        "Silo Pulmão Elevado": "Silos Pulmão Elevado",
+        "Silo Fundo Plano": "Silos Fundo Plano",
+    }
+    itens_relatorio = []
+    for item in itens:
+        item["modo_relatorio"] = item_modo_relatorio(item)
+        item["detalhes_relatorio"] = detalhes_relatorio_item(item)
+        itens_relatorio.append(item)
+
+    grupos = []
+    for grupo in grupos_ordem:
+        grupo_itens = [item for item in itens_relatorio if item.get("equipamento_nome") == grupo]
+        if grupo_itens:
+            grupos.append({"titulo": grupos_titulos.get(grupo, grupo), "itens": grupo_itens})
+    outros = [item for item in itens_relatorio if item.get("equipamento_nome") not in grupos_ordem]
+    if outros:
+        grupos.append({"titulo": "Outros", "itens": outros})
+
+    total = len(itens_relatorio)
+    engenharia = sum(1 for item in itens_relatorio if item["modo_relatorio"] == "Definição da Engenharia")
+    return {
+        "grupos": grupos,
+        "resumo": {
+            "total": total,
+            "definidos": total - engenharia,
+            "engenharia": engenharia,
+        },
+        "observacoes_automaticas": observacoes_automaticas(itens_relatorio),
+        "emitido_em": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "data_anteprojeto": anteprojeto["created_at"],
+    }
 
 
 def salvar_opcoes_item(conn, item_id, equipamento_id, form):
@@ -2187,30 +2355,38 @@ def remover_item(request: Request, anteprojeto_id: int, item_id: int):
     return RedirectResponse(f"/anteprojetos/{anteprojeto_id}", status_code=303)
 
 
-@app.get("/anteprojetos/{anteprojeto_id}/pdf")
+@app.get("/anteprojetos/{anteprojeto_id}/pdf", response_class=HTMLResponse)
 def pdf_anteprojeto(request: Request, anteprojeto_id: int):
     usuario = exigir_login(request)
     if isinstance(usuario, RedirectResponse):
         return usuario
     with get_conn() as conn:
         anteprojeto = get_anteprojeto_or_404(conn, anteprojeto_id)
-        criar_versao_anteprojeto(conn, anteprojeto_id, usuario, "Geracao de PDF final")
+        criar_versao_anteprojeto(conn, anteprojeto_id, usuario, "Geracao de relatorio final")
         registrar_historico_anteprojeto(
             conn,
             anteprojeto_id,
             usuario,
             "pdf_final",
-            "PDF final gerado",
+            "Relatório final gerado",
         )
         itens = conn.execute(
-            "SELECT * FROM itens_anteprojeto WHERE anteprojeto_id = ? ORDER BY tipo_definicao, equipamento_nome",
+            "SELECT * FROM itens_anteprojeto WHERE anteprojeto_id = ? ORDER BY equipamento_nome, id",
             (anteprojeto_id,),
         ).fetchall()
         itens = carregar_opcoes_itens(conn, [dict(item) for item in itens])
-        buffer = gerar_pdf_anteprojeto(anteprojeto, itens)
+        relatorio = preparar_relatorio_anteprojeto(anteprojeto, itens)
 
-    headers = {"Content-Disposition": f'inline; filename="anteprojeto-{anteprojeto_id}.pdf"'}
-    return StreamingResponse(buffer, media_type="application/pdf", headers=headers)
+    return templates.TemplateResponse(
+        "anteprojeto_relatorio.html",
+        {
+            "request": request,
+            "anteprojeto": anteprojeto,
+            "itens": itens,
+            "relatorio": relatorio,
+            "title": f"Relatório Anteprojeto #{anteprojeto_id}",
+        },
+    )
 
 
 @app.post("/anteprojetos/{anteprojeto_id}/versoes")

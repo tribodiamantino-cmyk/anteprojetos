@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="report-body">
+  <div class="report-actions no-print">
+    <a class="button" href="/anteprojetos/{{ anteprojeto.id }}">Voltar</a>
+    <button class="button primary" type="button" onclick="window.print()">Imprimir / Salvar em PDF</button>
+  </div>
+
+  <main class="report-page">
+    <header class="report-header card-avoid">
+      <div class="report-logo-slot">
+        <span>Logo</span>
+      </div>
+      <div>
+        <p class="report-kicker">Relatório Final de Anteprojeto</p>
+        <h1>{{ anteprojeto.cliente }} - {{ anteprojeto.obra_local }}</h1>
+        <dl class="report-meta">
+          <div><dt>Data de emissão</dt><dd>{{ relatorio.emitido_em }}</dd></div>
+          <div><dt>Empresa/Cliente</dt><dd>{{ anteprojeto.cliente }}</dd></div>
+          <div><dt>Cidade/UF</dt><dd>{{ anteprojeto.obra_local }}</dd></div>
+          <div><dt>Responsável comercial</dt><dd>{{ anteprojeto.responsavel }}</dd></div>
+        </dl>
+        {% if anteprojeto.observacoes_gerais %}
+        <p class="report-header-note">{{ anteprojeto.observacoes_gerais }}</p>
+        {% endif %}
+      </div>
+    </header>
+
+    <section class="report-card card-avoid">
+      <h2>Dados do Cliente</h2>
+      <dl class="report-grid">
+        <div><dt>Cliente</dt><dd>{{ anteprojeto.cliente }}</dd></div>
+        <div><dt>CPF/CNPJ</dt><dd>Não informado</dd></div>
+        <div><dt>Cidade/UF</dt><dd>{{ anteprojeto.obra_local }}</dd></div>
+        <div><dt>Contato</dt><dd>{{ anteprojeto.responsavel }}</dd></div>
+        <div><dt>Telefone</dt><dd>Não informado</dd></div>
+        <div><dt>E-mail</dt><dd>Não informado</dd></div>
+        <div><dt>Fazenda/Unidade</dt><dd>{{ anteprojeto.obra_local }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="report-card card-avoid">
+      <h2>Resumo do Anteprojeto</h2>
+      <dl class="report-summary-grid">
+        <div><dt>Total de itens</dt><dd>{{ relatorio.resumo.total }}</dd></div>
+        <div><dt>Já definidos</dt><dd>{{ relatorio.resumo.definidos }}</dd></div>
+        <div><dt>Definição da engenharia</dt><dd>{{ relatorio.resumo.engenharia }}</dd></div>
+        <div><dt>Data do anteprojeto</dt><dd>{{ relatorio.data_anteprojeto }}</dd></div>
+        <div><dt>Status</dt><dd>{{ anteprojeto.status }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="report-items">
+      <h2>Detalhamento dos Itens</h2>
+      {% if relatorio.grupos %}
+        {% for grupo in relatorio.grupos %}
+        <section class="report-group">
+          <h3>{{ grupo.titulo }}</h3>
+          <div class="report-item-list">
+            {% for item in grupo.itens %}
+            <article class="report-item-card card-avoid">
+              <div class="report-item-head">
+                <div>
+                  <h4>{{ item.equipamento_nome }}</h4>
+                  <p>{{ item.situacao }}</p>
+                </div>
+                <span>{{ item.quantidade }} un.</span>
+              </div>
+              <dl class="report-detail-list">
+                <div><dt>Quantidade</dt><dd>{{ item.quantidade }}</dd></div>
+                <div><dt>Modo de definição</dt><dd>{{ item.modo_relatorio }}</dd></div>
+                <div><dt>Situação</dt><dd>{{ item.situacao }}</dd></div>
+                {% for detalhe in item.detalhes_relatorio %}
+                <div><dt>{{ detalhe[0] }}</dt><dd>{{ detalhe[1] }}</dd></div>
+                {% endfor %}
+                {% if item.observacao_inicial %}
+                <div><dt>Observação do item</dt><dd>{{ item.observacao_inicial }}</dd></div>
+                {% endif %}
+                {% if item.retorno_engenharia %}
+                <div><dt>Retorno da engenharia</dt><dd>{{ item.retorno_engenharia }}</dd></div>
+                {% endif %}
+              </dl>
+            </article>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+      {% else %}
+        <p class="muted">Nenhum item adicionado ao anteprojeto.</p>
+      {% endif %}
+    </section>
+
+    <section class="report-card card-avoid">
+      <h2>Observações Técnicas</h2>
+      {% if anteprojeto.observacoes_gerais or relatorio.observacoes_automaticas %}
+      <ul class="report-notes">
+        {% if anteprojeto.observacoes_gerais %}
+        <li>{{ anteprojeto.observacoes_gerais }}</li>
+        {% endif %}
+        {% for observacao in relatorio.observacoes_automaticas %}
+        <li>{{ observacao }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">Sem observações técnicas adicionais.</p>
+      {% endif %}
+    </section>
+
+    <footer class="report-footer">
+      <span>Sistema de Anteprojetos</span>
+      <span>Gerado em {{ relatorio.emitido_em }}</span>
+      <span>Anteprojeto #{{ anteprojeto.id }}</span>
+    </footer>
+  </main>
+</body>
+</html>
