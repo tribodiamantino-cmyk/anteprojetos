@@ -548,6 +548,15 @@ def ensure_item1_fluxo(conn):
         ordem=5,
         obrigatorio=1,
     )
+    upsert_opcao_equipamento(
+        conn,
+        equipamento_id,
+        nome="Canalização sugerida",
+        chave="canalizacao_sugerida",
+        tipo="texto",
+        ordem=6,
+        obrigatorio=0,
+    )
     conn.execute(
         """
         INSERT OR REPLACE INTO equipamentos_opcoes_dependencias

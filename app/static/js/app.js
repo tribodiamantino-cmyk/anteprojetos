@@ -685,6 +685,29 @@
     return step;
   }
 
+  function canalizacaoFluxo(valor) {
+    const fluxo = Number(String(valor || "").replace(",", "."));
+    if (!fluxo) return "";
+    if (fluxo <= 60) return "Tubulação 200";
+    if (fluxo <= 120) return "Tubulação 240";
+    if (fluxo <= 240) return "Tubulação 320";
+    if (fluxo <= 300) return "Tubulação 380";
+    return "Tubulação Quadrada";
+  }
+
+  function renderCanalizacaoFluxo(option, canalizacao) {
+    const step = document.createElement("section");
+    step.className = "fluxo-step";
+    if (option) {
+      const hidden = fluxoHidden(option, canalizacao);
+      step.appendChild(hidden.fragment);
+    }
+    const title = document.createElement("h4");
+    title.textContent = `Canalização sugerida: ${canalizacao}`;
+    step.appendChild(title);
+    return step;
+  }
+
   function setSelectedEquipment(option) {
     selects[0].value = option.value;
     chooseLevel(0).catch(() => {
@@ -730,6 +753,7 @@
     const impurezasToggle = optionMap.fluxo_impurezas_habilitado;
     const impurezas = optionMap.fluxo_impurezas;
     const moega = optionMap.moega;
+    const canalizacao = optionMap.canalizacao_sugerida;
     const requiredOptions = [tipo, graos, impurezasToggle, impurezas, moega];
     if (requiredOptions.some((option) => !option)) {
       optionsBox.innerHTML = '<p class="muted">Configuracao do Fluxo incompleta.</p>';
@@ -795,6 +819,7 @@
       }
 
       if (state.graos) {
+        wrap.appendChild(renderCanalizacaoFluxo(canalizacao, canalizacaoFluxo(state.graos)));
         wrap.appendChild(
           makeFluxoStep("Etapa 3 - Fluxo de Impurezas", impurezasToggle, [
             { label: "Sem fluxo de impurezas", value: "nao" },

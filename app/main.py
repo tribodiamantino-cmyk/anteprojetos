@@ -225,18 +225,60 @@ def equipamento_nome_exibicao(nome):
     return nome
 
 
+def canalizacao_fluxo(valor_fluxo):
+    try:
+        fluxo = float(str(valor_fluxo or "").replace(",", "."))
+    except ValueError:
+        return ""
+    if fluxo <= 60:
+        return "Tubulação 200"
+    if fluxo <= 120:
+        return "Tubulação 240"
+    if fluxo <= 240:
+        return "Tubulação 320"
+    if fluxo <= 300:
+        return "Tubulação 380"
+    return "Tubulação Quadrada"
+
+
+def aplicar_canalizacao_fluxo(opcoes):
+    dados = {opcao["opcao_chave"]: opcao for opcao in opcoes}
+    graos = dados.get("fluxo_graos")
+    if not graos:
+        return opcoes
+    canalizacao = canalizacao_fluxo(graos.get("valor") or graos.get("valor_rotulo"))
+    if not canalizacao:
+        return opcoes
+    existente = dados.get("canalizacao_sugerida")
+    if existente:
+        existente["valor"] = canalizacao
+        existente["valor_rotulo"] = canalizacao
+        return opcoes
+    opcoes.append(
+        {
+            "opcao_nome": "Canalização sugerida",
+            "opcao_chave": "canalizacao_sugerida",
+            "valor": canalizacao,
+            "valor_rotulo": canalizacao,
+        }
+    )
+    return opcoes
+
+
 def resumo_fluxo(opcoes):
+    opcoes = aplicar_canalizacao_fluxo(opcoes)
     dados = {opcao["opcao_chave"]: opcao for opcao in opcoes}
     tipo = dados.get("tipo_fluxo", {}).get("valor_rotulo") or "-"
     graos = dados.get("fluxo_graos", {}).get("valor_rotulo") or "-"
     impurezas_habilitado = dados.get("fluxo_impurezas_habilitado", {}).get("valor") == "sim"
     moega = dados.get("moega", {}).get("valor_rotulo") or "-"
+    canalizacao = dados.get("canalizacao_sugerida", {}).get("valor_rotulo") or "-"
     if impurezas_habilitado:
         impurezas_valor = dados.get("fluxo_impurezas", {}).get("valor_rotulo") or "-"
         impurezas = f"Sim - {impurezas_valor}"
     else:
         impurezas = "Não"
-    return f"Fluxo | Tipo: {tipo} | Grãos: {graos} | Impurezas: {impurezas} | Moega: {moega}"
+    return f"Fluxo | Tipo: {tipo} | Grãos: {graos} | Canalização: {canalizacao} | Impurezas: {impurezas} | Moega: {moega}"
 
 
 def resumo_transportador(campos):
@@ -644,6 +686,7 @@ def carregar_opcoes_itens(conn, itens):
         item["opcoes"] = [dict(opcao) for opcao in opcoes]
         if item["equipamento_nome"] in ("Fluxo", "Item 1 - Fluxo"):
             item["equipamento_nome"] = "Fluxo"
+            item["opcoes"] = aplicar_canalizacao_fluxo(item["opcoes"])
             item["resumo_fluxo"] = resumo_fluxo(item["opcoes"])
         elif item["equipamento_nome"] in ("Transportador", "Item 2 - Transportadores"):
             item["equipamento_nome"] = "Transportador"
