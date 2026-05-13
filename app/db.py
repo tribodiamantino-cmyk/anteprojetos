@@ -544,7 +544,7 @@ def ensure_item1_fluxo(conn):
         nome="Fluxo de Impurezas (Ton/h)",
         chave="fluxo_impurezas",
         tipo="selecao",
-        valores=[(capacidade, f"{capacidade} Ton/h") for capacidade in capacidades],
+        valores=[("a_definir", "A definir"), *[(capacidade, f"{capacidade} Ton/h") for capacidade in capacidades]],
         ordem=5,
         obrigatorio=1,
     )
