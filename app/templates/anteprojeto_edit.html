@@ -121,6 +121,9 @@
       <button class="button primary" type="submit">
         {% if item_editando %}Salvar alteracoes{% else %}Adicionar ao anteprojeto{% endif %}
       </button>
+      {% if not item_editando %}
+      <button class="button" type="button" data-cancel-add-item>Cancelar adicao</button>
+      {% endif %}
     </div>
   </form>
 </section>

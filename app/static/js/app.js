@@ -237,9 +237,11 @@
   const tipoDefinicaoSelect = form.querySelector('select[name="tipo_definicao"]');
   const tipoDefinicaoField = form.querySelector("[data-tipo-definicao-field]");
   const observacaoInicialField = form.querySelector('textarea[name="observacao_inicial"]')?.closest("[data-final-fields]");
+  const cancelAddButtons = Array.from(form.querySelectorAll("[data-cancel-add-item]"));
   const selectedChain = window.ITEM_EDITANDO_CADEIA || [];
   const selectedOptions = window.ITEM_EDITANDO_OPCOES || {};
   const selectedCampos = window.ITEM_EDITANDO_CAMPOS || {};
+  const editingItem = Boolean(form.querySelector('input[name="item_id"]'));
   let definitionMode = selectedCampos.modo_definicao === "engenharia" ? "engenharia" : "";
 
   const transportadorConfig = {
@@ -753,6 +755,7 @@
       setEngineeringFinalLayout(false);
       technicalRenderer();
       optionsBox.prepend(makeModoDefinicaoPanel(technicalRenderer));
+      addBackToPickerAction();
       return;
     }
 
@@ -798,6 +801,7 @@
     }
 
     optionsBox.appendChild(wrap);
+    addBackToPickerAction();
   }
 
   function canalizacaoFluxo(valor) {
@@ -860,6 +864,43 @@
     step.appendChild(grid);
     wrap.appendChild(step);
     optionsBox.appendChild(wrap);
+  }
+
+  function resetEquipmentPicker() {
+    definitionMode = "";
+    clearSelectedTechnicalCampos();
+    finalInput.value = "";
+    attrsBox.innerHTML = "";
+    optionsBox.innerHTML = "";
+    pathBox.textContent = "";
+    selects[0].value = "";
+    for (let index = 1; index < selects.length; index += 1) {
+      resetSelect(selects[index], selects[index].dataset.placeholder || "Selecione");
+    }
+    if (quantidadeInput) {
+      quantidadeInput.value = "1";
+    }
+    setVariationFieldsVisible(false);
+    renderEquipmentPicker();
+  }
+
+  function makeBackToPickerAction() {
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button";
+    button.textContent = "Voltar para escolha do item";
+    button.addEventListener("click", resetEquipmentPicker);
+    actions.appendChild(button);
+    return actions;
+  }
+
+  function addBackToPickerAction() {
+    if (editingItem || !finalInput.value || optionsBox.querySelector("[data-back-to-equipment-picker]")) return;
+    const action = makeBackToPickerAction();
+    action.dataset.backToEquipmentPicker = "true";
+    optionsBox.prepend(action);
   }
 
   function renderFluxoOptions(options) {
@@ -1905,34 +1946,42 @@
     optionsBox.innerHTML = "";
     if (isFluxoSelected()) {
       renderModoDefinicao(() => renderFluxoOptions(options));
+      addBackToPickerAction();
       return;
     }
     if (isTransportadorSelected()) {
       renderModoDefinicao(renderTransportadorOptions);
+      addBackToPickerAction();
       return;
     }
     if (isMaquinaLimpezaSelected()) {
       renderModoDefinicao(renderMaquinaLimpezaOptions);
+      addBackToPickerAction();
       return;
     }
     if (isSecadorSelected()) {
       renderModoDefinicao(renderSecadorOptions);
+      addBackToPickerAction();
       return;
     }
     if (isSiloPulmaoSelected()) {
       renderModoDefinicao(renderSiloPulmaoOptions);
+      addBackToPickerAction();
       return;
     }
     if (isSiloFundoPlanoSelected()) {
       renderModoDefinicao(renderSiloFundoPlanoOptions);
+      addBackToPickerAction();
       return;
     }
     if (isExpedicaoSelected()) {
       renderModoDefinicao(renderExpedicaoOptions);
+      addBackToPickerAction();
       return;
     }
     if (!options.length) {
       optionsBox.innerHTML = '<p class="muted">Nenhuma configuracao cadastrada para este item.</p>';
+      addBackToPickerAction();
       return;
     }
 
@@ -2013,6 +2062,7 @@
 
     optionsBox.appendChild(grid);
     bindOptionDependencies();
+    addBackToPickerAction();
   }
 
   function optionValue(optionId) {
@@ -2178,6 +2228,10 @@
         attrsBox.innerHTML = '<p class="muted">Nao foi possivel carregar os dados do equipamento.</p>';
       });
     });
+  });
+
+  cancelAddButtons.forEach((button) => {
+    button.addEventListener("click", resetEquipmentPicker);
   });
 
   form.addEventListener("submit", (event) => {
