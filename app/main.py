@@ -203,6 +203,7 @@ def parse_item(row):
     item["resumo_secador"] = ""
     item["resumo_silo_pulmao"] = ""
     item["resumo_silo_fundo_plano"] = ""
+    item["resumo_expedicao"] = ""
     return item
 
 
@@ -219,6 +220,8 @@ def equipamento_nome_exibicao(nome):
         return "Silo Pulmão Elevado"
     if nome == "Item 6 - Silo Fundo Plano":
         return "Silo Fundo Plano"
+    if nome == "Item 7 - Expedição":
+        return "Expedição"
     return nome
 
 
@@ -481,6 +484,100 @@ def collect_silo_fundo_plano_campos(form):
     return campos
 
 
+EXPEDICAO_TIPOS = {
+    "silo": "Silo de Expedição",
+    "tulha": "Tulha de Expedição",
+}
+EXPEDICAO_SILO_MODELOS = {
+    "silo_2_aneis": {"aneis": "2", "ton": "41", "sacas": "689"},
+    "silo_3_aneis": {"aneis": "3", "ton": "55", "sacas": "916"},
+    "silo_4_aneis": {"aneis": "4", "ton": "69", "sacas": "1.142"},
+    "silo_5_aneis": {"aneis": "5", "ton": "82", "sacas": "1.369"},
+}
+EXPEDICAO_TULHA_MODELOS = {
+    "tulha_55": {"volume": "55 m³", "modulos": "01 módulo", "ton": "40"},
+    "tulha_110": {"volume": "110 m³", "modulos": "02 módulos", "ton": "80"},
+    "tulha_165": {"volume": "165 m³", "modulos": "03 módulos", "ton": "120"},
+    "tulha_220": {"volume": "220 m³", "modulos": "04 módulos", "ton": "160"},
+}
+EXPEDICAO_ESTRUTURAS = {
+    "4_9": "4,9 m",
+    "5_9": "5,9 m",
+}
+EXPEDICAO_ESCADAS = {
+    "marinheiro": "Marinheiro",
+    "de_lance": "De Lance",
+}
+
+
+def resumo_expedicao(campos):
+    tipo = campos.get("tipo")
+    partes = [campos.get("tipo_rotulo") or "Expedição"]
+    if tipo == "silo":
+        partes.extend(
+            [
+                "15 ft",
+                f"{campos.get('aneis')} anéis",
+                f"{campos.get('ton')} Ton",
+            ]
+        )
+        if campos.get("estrutura_rotulo"):
+            partes.append(f"Estrutura {campos.get('estrutura_rotulo')}")
+    elif tipo == "tulha":
+        partes.extend(
+            [
+                campos.get("volume") or "",
+                campos.get("modulos") or "",
+                f"{campos.get('ton')} Ton",
+            ]
+        )
+    if campos.get("escada_rotulo"):
+        partes.append(f"Escada {campos.get('escada_rotulo')}")
+    if campos.get("sensor_nivel") == "sim":
+        partes.append("Sensor de nível")
+    if tipo == "silo" and campos.get("suporte_balanca") == "sim":
+        suporte = campos.get("suporte_balanca_descricao") or "Suporte para balança"
+        partes.append(suporte)
+    return " | ".join(parte for parte in partes if parte)
+
+
+def collect_expedicao_campos(form):
+    tipo = (form.get("expedicao_tipo") or "").strip()
+    modelo = (form.get("expedicao_modelo") or "").strip()
+    campos = {
+        "tipo": tipo,
+        "tipo_rotulo": EXPEDICAO_TIPOS.get(tipo, tipo),
+        "modelo": modelo,
+        "sensor_nivel": (form.get("expedicao_sensor_nivel") or "").strip(),
+        "escada": (form.get("expedicao_escada") or "").strip(),
+        "escada_rotulo": EXPEDICAO_ESCADAS.get((form.get("expedicao_escada") or "").strip(), ""),
+    }
+    if tipo == "silo":
+        modelo_dados = EXPEDICAO_SILO_MODELOS.get(modelo, {})
+        campos.update(
+            {
+                "diametro": "15",
+                "aneis": modelo_dados.get("aneis", ""),
+                "ton": modelo_dados.get("ton", ""),
+                "sacas": modelo_dados.get("sacas", ""),
+                "estrutura": (form.get("expedicao_estrutura") or "").strip(),
+                "estrutura_rotulo": EXPEDICAO_ESTRUTURAS.get((form.get("expedicao_estrutura") or "").strip(), ""),
+                "suporte_balanca": (form.get("expedicao_suporte_balanca") or "").strip(),
+                "suporte_balanca_descricao": (form.get("expedicao_suporte_balanca_descricao") or "").strip(),
+            }
+        )
+    elif tipo == "tulha":
+        modelo_dados = EXPEDICAO_TULHA_MODELOS.get(modelo, {})
+        campos.update(
+            {
+                "volume": modelo_dados.get("volume", ""),
+                "modulos": modelo_dados.get("modulos", ""),
+                "ton": modelo_dados.get("ton", ""),
+            }
+        )
+    return campos
+
+
 TRANSPORTADOR_TIPOS = {
     "redler": "Redler",
     "correia": "Correia",
@@ -566,6 +663,9 @@ def carregar_opcoes_itens(conn, itens):
         elif item["equipamento_nome"] in ("Silo Fundo Plano", "Item 6 - Silo Fundo Plano"):
             item["equipamento_nome"] = "Silo Fundo Plano"
             item["resumo_silo_fundo_plano"] = resumo_silo_fundo_plano(item["campos"])
+        elif item["equipamento_nome"] in ("Expedição", "Item 7 - Expedição"):
+            item["equipamento_nome"] = "Expedição"
+            item["resumo_expedicao"] = resumo_expedicao(item["campos"])
     return itens
 
 
@@ -1703,6 +1803,7 @@ def editar_anteprojeto(
                     WHEN nome = 'Item 4 - Secadores Process Dryer' THEN 'Secadores Process Dryer'
                     WHEN nome = 'Item 5 - Silo Pulmão Elevado' THEN 'Silo Pulmão Elevado'
                     WHEN nome = 'Item 6 - Silo Fundo Plano' THEN 'Silo Fundo Plano'
+                    WHEN nome = 'Item 7 - Expedição' THEN 'Expedição'
                     ELSE nome
                 END AS nome,
                 nome AS cadastro_nome
@@ -1860,6 +1961,8 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             campos = collect_silo_pulmao_campos(form)
         elif equipamento["nome"] == "Item 6 - Silo Fundo Plano":
             campos = collect_silo_fundo_plano_campos(form)
+        elif equipamento["nome"] == "Item 7 - Expedição":
+            campos = collect_expedicao_campos(form)
         else:
             campos = collect_campos(form, schema)
         campos_json = json.dumps(campos, ensure_ascii=False)

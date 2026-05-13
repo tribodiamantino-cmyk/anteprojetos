@@ -434,6 +434,28 @@
     ],
   };
 
+  const expedicaoConfig = {
+    tipos: [
+      { value: "silo", label: "Silo de Expedição" },
+      { value: "tulha", label: "Tulha de Expedição" },
+    ],
+    silos: [
+      { value: "silo_2_aneis", aneis: "2", ton: "41", sacas: "689" },
+      { value: "silo_3_aneis", aneis: "3", ton: "55", sacas: "916" },
+      { value: "silo_4_aneis", aneis: "4", ton: "69", sacas: "1.142" },
+      { value: "silo_5_aneis", aneis: "5", ton: "82", sacas: "1.369" },
+    ],
+    tulhas: [
+      { value: "tulha_55", volume: "55 m³", modulos: "01 módulo", ton: "40" },
+      { value: "tulha_110", volume: "110 m³", modulos: "02 módulos", ton: "80" },
+      { value: "tulha_165", volume: "165 m³", modulos: "03 módulos", ton: "120" },
+      { value: "tulha_220", volume: "220 m³", modulos: "04 módulos", ton: "160" },
+    ],
+    simNao: siloPulmaoConfig.simNao,
+    estruturas: [{ value: "4_9", label: "4,9 m" }, { value: "5_9", label: "5,9 m" }],
+    escadas: [{ value: "marinheiro", label: "Marinheiro" }, { value: "de_lance", label: "De Lance" }],
+  };
+
   function selectedCadastroNome() {
     const option = selects[0].selectedOptions[0];
     return option ? option.dataset.cadastroNome || option.textContent : "";
@@ -464,6 +486,10 @@
 
   function isSiloFundoPlanoSelected() {
     return selectedCadastroNome() === "Item 6 - Silo Fundo Plano" || selectedPath()[0] === "Silo Fundo Plano";
+  }
+
+  function isExpedicaoSelected() {
+    return selectedCadastroNome() === "Item 7 - Expedição" || selectedPath()[0] === "Expedição";
   }
 
   function setVariationFieldsVisible(visible) {
@@ -1592,6 +1618,148 @@
     rerender();
   }
 
+  function renderExpedicaoOptions() {
+    const state = {
+      tipo: selectedCampos.tipo || "",
+      modelo: selectedCampos.modelo || "",
+      sensorNivel: selectedCampos.sensor_nivel || "",
+      estrutura: selectedCampos.estrutura || "",
+      escada: selectedCampos.escada || "",
+      suporteBalanca: selectedCampos.suporte_balanca || "",
+      suporteBalancaDescricao: selectedCampos.suporte_balanca_descricao || "",
+    };
+
+    if (quantidadeInput) {
+      quantidadeInput.oninput = null;
+    }
+
+    const resetSelection = () => {
+      state.modelo = "";
+      state.sensorNivel = "";
+      state.estrutura = "";
+      state.escada = "";
+      state.suporteBalanca = "";
+      state.suporteBalancaDescricao = "";
+    };
+    const resetAccessories = () => {
+      state.sensorNivel = "";
+      state.estrutura = "";
+      state.escada = "";
+      state.suporteBalanca = "";
+      state.suporteBalancaDescricao = "";
+    };
+    const complete = () => Boolean(
+      state.tipo &&
+      state.modelo &&
+      state.sensorNivel &&
+      state.escada &&
+      (state.tipo === "tulha" || (state.estrutura && state.suporteBalanca))
+    );
+
+    function renderHiddenFields(container) {
+      container.appendChild(hiddenInput("expedicao_tipo", state.tipo));
+      container.appendChild(hiddenInput("expedicao_modelo", state.modelo));
+      container.appendChild(hiddenInput("expedicao_sensor_nivel", state.sensorNivel));
+      container.appendChild(hiddenInput("expedicao_estrutura", state.estrutura));
+      container.appendChild(hiddenInput("expedicao_escada", state.escada));
+      container.appendChild(hiddenInput("expedicao_suporte_balanca", state.suporteBalanca));
+      container.appendChild(hiddenInput("expedicao_suporte_balanca_descricao", state.suporteBalancaDescricao));
+    }
+
+    function renderStep(titleText, choices, currentValue, onChange) {
+      const step = document.createElement("section");
+      step.className = "fluxo-step";
+      const title = document.createElement("h4");
+      title.textContent = titleText;
+      step.appendChild(title);
+      const grid = document.createElement("div");
+      grid.className = "choice-card-grid";
+      choices.forEach((choice) => grid.appendChild(makeFluxoCard(choice.label, choice.value, currentValue === choice.value, () => onChange(choice.value))));
+      step.appendChild(grid);
+      return step;
+    }
+
+    function modeloCard(modelo, html) {
+      const selected = state.modelo === modelo.value;
+      const button = makeFluxoCard("", modelo.value, selected, () => {
+        state.modelo = modelo.value;
+        resetAccessories();
+        rerender();
+      });
+      button.classList.add("silo-card");
+      button.innerHTML = html;
+      return button;
+    }
+
+    function renderModelos(container) {
+      if (!state.tipo) return;
+      const step = document.createElement("section");
+      step.className = "fluxo-step";
+      const title = document.createElement("h4");
+      title.textContent = state.tipo === "silo" ? "Etapa 2 - Silo de Expedição" : "Etapa 2 - Tulha de Expedição";
+      step.appendChild(title);
+      const grid = document.createElement("div");
+      grid.className = "choice-card-grid";
+      if (state.tipo === "silo") {
+        expedicaoConfig.silos.forEach((modelo) => {
+          grid.appendChild(modeloCard(modelo, `<strong>${modelo.aneis} anéis</strong><span>15 ft</span><span>${modelo.ton} Ton</span><span>${modelo.sacas} scs</span>`));
+        });
+      } else {
+        expedicaoConfig.tulhas.forEach((modelo) => {
+          grid.appendChild(modeloCard(modelo, `<strong>${modelo.volume}</strong><span>${modelo.modulos}</span><span>${modelo.ton} Ton</span>`));
+        });
+      }
+      step.appendChild(grid);
+      container.appendChild(step);
+    }
+
+    function renderSuporteDescricao(container) {
+      if (state.tipo !== "silo" || state.suporteBalanca !== "sim") return;
+      const step = document.createElement("section");
+      step.className = "fluxo-step";
+      const label = document.createElement("label");
+      label.textContent = "Descrição do suporte para balança";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Ex.: Suporte para balança Toledo 120t";
+      input.value = state.suporteBalancaDescricao;
+      input.addEventListener("input", () => {
+        state.suporteBalancaDescricao = input.value;
+        const hidden = optionsBox.querySelector('[name="expedicao_suporte_balanca_descricao"]');
+        if (hidden) hidden.value = state.suporteBalancaDescricao;
+      });
+      label.appendChild(input);
+      step.appendChild(label);
+      container.appendChild(step);
+    }
+
+    function rerender() {
+      optionsBox.innerHTML = "";
+      setFinalFieldsVisible(complete());
+      const wrap = document.createElement("div");
+      wrap.className = "fluxo-wizard";
+      const title = document.createElement("h3");
+      title.textContent = "Expedição";
+      wrap.appendChild(title);
+      renderHiddenFields(wrap);
+
+      wrap.appendChild(renderStep("Etapa 1 - Tipo", expedicaoConfig.tipos, state.tipo, (value) => {
+        state.tipo = value;
+        resetSelection();
+        rerender();
+      }));
+      renderModelos(wrap);
+      if (state.modelo) wrap.appendChild(renderStep("Sensor de nível", expedicaoConfig.simNao, state.sensorNivel, (value) => { state.sensorNivel = value; state.estrutura = ""; state.escada = ""; state.suporteBalanca = ""; state.suporteBalancaDescricao = ""; rerender(); }));
+      if (state.tipo === "silo" && state.sensorNivel) wrap.appendChild(renderStep("Estrutura metálica", expedicaoConfig.estruturas, state.estrutura, (value) => { state.estrutura = value; state.escada = ""; state.suporteBalanca = ""; state.suporteBalancaDescricao = ""; rerender(); }));
+      if ((state.tipo === "tulha" && state.sensorNivel) || (state.tipo === "silo" && state.estrutura)) wrap.appendChild(renderStep("Tipo de escada", expedicaoConfig.escadas, state.escada, (value) => { state.escada = value; state.suporteBalanca = ""; state.suporteBalancaDescricao = ""; rerender(); }));
+      if (state.tipo === "silo" && state.escada) wrap.appendChild(renderStep("Suporte para balança", expedicaoConfig.simNao, state.suporteBalanca, (value) => { state.suporteBalanca = value; state.suporteBalancaDescricao = ""; rerender(); }));
+      renderSuporteDescricao(wrap);
+      optionsBox.appendChild(wrap);
+    }
+
+    rerender();
+  }
+
   function renderOptions(options) {
     optionsBox.innerHTML = "";
     if (isFluxoSelected()) {
@@ -1616,6 +1784,10 @@
     }
     if (isSiloFundoPlanoSelected()) {
       renderSiloFundoPlanoOptions();
+      return;
+    }
+    if (isExpedicaoSelected()) {
+      renderExpedicaoOptions();
       return;
     }
     if (!options.length) {
@@ -1838,6 +2010,16 @@
       return;
     }
 
+    if (level === 0 && isExpedicaoSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedId;
+      pathBox.textContent = "Expedição";
+      attrsBox.innerHTML = "";
+      await loadOptions(selectedId);
+      return;
+    }
+
     setVariationFieldsVisible(true);
     setFinalFieldsVisible(true);
     const children = await loadChildren(level, selectedId);
@@ -1864,7 +2046,7 @@
       return;
     }
     if (
-      (isFluxoSelected() || isTransportadorSelected() || isMaquinaLimpezaSelected() || isSecadorSelected() || isSiloPulmaoSelected() || isSiloFundoPlanoSelected()) &&
+      (isFluxoSelected() || isTransportadorSelected() || isMaquinaLimpezaSelected() || isSecadorSelected() || isSiloPulmaoSelected() || isSiloFundoPlanoSelected() || isExpedicaoSelected()) &&
       finalFields.some((element) => element.hidden)
     ) {
       event.preventDefault();
@@ -1929,6 +2111,15 @@
       setFinalFieldsVisible(false);
       finalInput.value = selectedChain[0].id;
       pathBox.textContent = "Silo Fundo Plano";
+      attrsBox.innerHTML = "";
+      await loadOptions(finalInput.value);
+      return;
+    }
+    if (isExpedicaoSelected()) {
+      setVariationFieldsVisible(false);
+      setFinalFieldsVisible(false);
+      finalInput.value = selectedChain[0].id;
+      pathBox.textContent = "Expedição";
       attrsBox.innerHTML = "";
       await loadOptions(finalInput.value);
       return;

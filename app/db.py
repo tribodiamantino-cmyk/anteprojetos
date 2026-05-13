@@ -381,13 +381,14 @@ def ensure_default_equipamentos(conn):
     ensure_item4_secadores(conn)
     ensure_item5_silo_pulmao(conn)
     ensure_item6_silo_fundo_plano(conn)
+    ensure_item7_expedicao(conn)
 
 
 def prune_equipamentos_to_default_items(conn):
     permitidos = conn.execute(
         """
         SELECT id FROM equipamentos_modelo
-        WHERE nome IN (?, ?, ?, ?, ?, ?)
+        WHERE nome IN (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             "Item 1 - Fluxo",
@@ -396,6 +397,7 @@ def prune_equipamentos_to_default_items(conn):
             "Item 4 - Secadores Process Dryer",
             "Item 5 - Silo Pulmão Elevado",
             "Item 6 - Silo Fundo Plano",
+            "Item 7 - Expedição",
         ),
     ).fetchall()
     permitidos_ids = [row["id"] for row in permitidos]
@@ -758,6 +760,46 @@ def ensure_item6_silo_fundo_plano(conn):
         "Configuração do Silo Fundo Plano.",
         "Configuracao",
         "Silo Fundo Plano",
+        "",
+        "",
+        schema_json,
+    )
+    if equipamento:
+        conn.execute(
+            """
+            UPDATE equipamentos_modelo
+            SET descricao = ?, categoria = ?, subcategoria = ?, fabricante = ?,
+                modelo = ?, schema_json = ?, ativo = 1,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (*valores, equipamento["id"]),
+        )
+        return equipamento["id"]
+
+    cur = conn.execute(
+        """
+        INSERT INTO equipamentos_modelo
+        (parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (None, nome, *valores, 1),
+    )
+    return cur.lastrowid
+
+
+def ensure_item7_expedicao(conn):
+    nome = "Item 7 - Expedição"
+    schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
+    equipamento = conn.execute(
+        "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
+        (nome,),
+    ).fetchone()
+
+    valores = (
+        "Configuração de Expedição.",
+        "Configuracao",
+        "Expedicao",
         "",
         "",
         schema_json,
