@@ -2044,7 +2044,13 @@ def editar_anteprojeto(
                 nome AS cadastro_nome
             FROM equipamentos_modelo
             WHERE parent_id IS NULL AND ativo = 1
-            ORDER BY nome, id
+            ORDER BY
+                CASE
+                    WHEN nome LIKE 'Item % - %' THEN CAST(substr(nome, 6, instr(nome, ' - ') - 6) AS INTEGER)
+                    ELSE 999
+                END,
+                nome,
+                id
             """
         ).fetchall()
         itens_rows = conn.execute(
