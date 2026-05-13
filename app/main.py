@@ -820,6 +820,8 @@ def detalhes_relatorio_item(item):
             detalhes.append(("Aeração", "Não"))
         if campos.get("escada_rotulo"):
             detalhes.append(("Escada", campos.get("escada_rotulo")))
+        if int(item.get("quantidade") or 1) > 1:
+            detalhes.append(("Alternar escadas caracol e marinheiro", "Sim" if campos.get("alternar_escadas") == "sim" else "Não"))
         extras = [extra.get("rotulo") for extra in campos.get("escada_extras") or [] if extra.get("rotulo")]
         if extras:
             detalhes.append(("Acessórios", ", ".join(extras)))
