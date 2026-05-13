@@ -1536,7 +1536,7 @@ async def criar_usuario(request: Request):
                 dados["ativo"],
             ),
         )
-    return RedirectResponse(f"/usuarios/{cur.lastrowid}/editar", status_code=303)
+    return RedirectResponse("/usuarios", status_code=303)
 
 
 @app.get("/usuarios/{usuario_id}/editar", response_class=HTMLResponse)
