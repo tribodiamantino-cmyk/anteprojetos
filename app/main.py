@@ -299,6 +299,21 @@ def resumo_fluxo(opcoes):
 
 
 def resumo_transportador(campos):
+    transportadores = campos.get("transportadores") or []
+    if transportadores:
+        partes = []
+        for item in transportadores:
+            tipo = item.get("tipo_rotulo") or item.get("tipo") or "-"
+            subtipo = item.get("subtipo_rotulo") or ""
+            quantidade = item.get("quantidade") or 1
+            descricao = f"{quantidade}x {' '.join(part for part in [tipo, subtipo] if part).strip()}"
+            if item.get("pe_auto_limpante") == "sim":
+                descricao += " com pe autolimpante"
+            if item.get("observacao"):
+                descricao += f" ({item['observacao']})"
+            partes.append(descricao)
+        return f"Transportadores | {'; '.join(partes)}"
+
     tipo = campos.get("tipo_rotulo") or "-"
     subtipo = campos.get("subtipo_rotulo") or ""
     equipamento = f"{tipo} {subtipo}".strip()
@@ -652,41 +667,47 @@ TRANSPORTADOR_SUBTIPOS = {
     "aberta_nova": "Aberta Nova",
 }
 TRANSPORTADOR_ITENS = {
-    "sensor_rotacao": {"nome": "Sensor de Rotação", "resumo": "Rotação", "categoria": "sensor"},
-    "sensor_temperatura": {"nome": "Sensor de Temperatura", "resumo": "Temperatura", "categoria": "sensor"},
-    "sensor_embuchamento": {"nome": "Sensor de Embuchamento", "resumo": "Embuchamento", "categoria": "sensor"},
-    "sensor_desalinhamento": {"nome": "Sensor de Desalinhamento", "resumo": "Desalinhamento", "categoria": "sensor"},
-    "janela_alivio_pressao": {"nome": "Janela de Alívio de Pressão", "resumo": "Janela de Alívio", "categoria": "acessorio"},
-    "filtro_pontual": {"nome": "Filtro Pontual", "resumo": "Filtro Pontual", "categoria": "acessorio"},
-    "modulo_alivio_pressao": {"nome": "Módulo de Alívio de Pressão", "resumo": "Módulo de Alívio", "categoria": "acessorio"},
     "pe_auto_limpante": {"nome": "Pé Auto-Limpante", "resumo": "Pé Auto-Limpante", "categoria": "acessorio"},
-    "plataforma_valvula_2_vias": {
-        "nome": "Plataforma p/ manutenção de válvula 2 vias",
-        "resumo": "Plataforma válvula 2 vias",
-        "categoria": "acessorio",
-    },
 }
 
 
 def collect_transportador_campos(form):
+    transportadores = []
+    for tipo in form.getlist("transportador_tipo"):
+        tipo = (tipo or "").strip()
+        if tipo not in TRANSPORTADOR_TIPOS:
+            continue
+        subtipo = (form.get(f"transportador_subtipo__{tipo}") or "").strip()
+        quantidade_raw = (form.get(f"transportador_quantidade__{tipo}") or "1").strip()
+        try:
+            quantidade = max(1, int(quantidade_raw))
+        except ValueError:
+            quantidade = 1
+        item = {
+            "tipo": tipo,
+            "tipo_rotulo": TRANSPORTADOR_TIPOS.get(tipo, tipo),
+            "subtipo": subtipo,
+            "subtipo_rotulo": TRANSPORTADOR_SUBTIPOS.get(subtipo, ""),
+            "quantidade": quantidade,
+            "observacao": (form.get(f"transportador_obs__{tipo}") or "").strip(),
+        }
+        if tipo == "elevador":
+            item["pe_auto_limpante"] = (form.get("transportador_pe_auto_limpante__elevador") or "nao").strip()
+            item["pe_auto_limpante_rotulo"] = "Sim" if item["pe_auto_limpante"] == "sim" else "Não"
+        transportadores.append(item)
+
+    if transportadores:
+        return {"transportadores": transportadores}
+
     tipo = (form.get("transportador_tipo") or "").strip()
     subtipo = (form.get("transportador_subtipo") or "").strip()
-    selecionados = form.getlist("transportador_item")
-    itens = []
-    for chave in selecionados:
-        definicao = TRANSPORTADOR_ITENS.get(chave)
-        if not definicao:
-            continue
-        item = dict(definicao)
-        item["chave"] = chave
-        item["observacao"] = (form.get(f"transportador_obs__{chave}") or "").strip()
-        itens.append(item)
     return {
+        "transportadores": [],
         "tipo": tipo,
         "tipo_rotulo": TRANSPORTADOR_TIPOS.get(tipo, tipo),
         "subtipo": subtipo,
         "subtipo_rotulo": TRANSPORTADOR_SUBTIPOS.get(subtipo, ""),
-        "sensores_acessorios": itens,
+        "sensores_acessorios": [],
     }
 
 
@@ -770,6 +791,20 @@ def detalhes_relatorio_item(item):
         return detalhes
 
     if nome == "Transportador":
+        transportadores = campos.get("transportadores") or []
+        if transportadores:
+            for item_transportador in transportadores:
+                tipo = " ".join(
+                    part for part in [item_transportador.get("tipo_rotulo"), item_transportador.get("subtipo_rotulo")] if part
+                )
+                quantidade = item_transportador.get("quantidade") or 1
+                detalhes.append((f"{tipo} - quantidade", quantidade))
+                if item_transportador.get("pe_auto_limpante") == "sim":
+                    detalhes.append((f"{tipo} - pé autolimpante", "Sim"))
+                if item_transportador.get("observacao"):
+                    detalhes.append((f"{tipo} - observação", item_transportador["observacao"]))
+            return detalhes
+
         equipamento = " ".join(part for part in [campos.get("tipo_rotulo"), campos.get("subtipo_rotulo")] if part)
         if equipamento:
             detalhes.append(("Equipamento", equipamento))

@@ -585,7 +585,7 @@ def ensure_item2_transportadores(conn):
             WHERE id = ?
             """,
             (
-                "Configuracao de transportadores, sensores e acessorios do anteprojeto.",
+                "Configuracao de transportadores do anteprojeto.",
                 "Configuracao",
                 "Transportadores",
                 "",
@@ -605,7 +605,7 @@ def ensure_item2_transportadores(conn):
         (
             None,
             nome,
-            "Configuracao de transportadores, sensores e acessorios do anteprojeto.",
+            "Configuracao de transportadores do anteprojeto.",
             "Configuracao",
             "Transportadores",
             "",

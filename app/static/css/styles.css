@@ -809,8 +809,35 @@ legend {
   color: var(--muted);
 }
 
+.transportador-config-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.transportador-config-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.transportador-config-card h4 {
+  margin: 0 0 12px;
+}
+
+.transportador-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 @media (max-width: 720px) {
   .transport-check-card {
+    grid-template-columns: 1fr;
+  }
+
+  .transportador-config-grid {
     grid-template-columns: 1fr;
   }
 }

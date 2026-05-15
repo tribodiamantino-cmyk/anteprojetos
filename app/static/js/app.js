@@ -252,32 +252,6 @@
       { value: "helicoidal", label: "Helicoidal", subtipos: [] },
       { value: "elevador", label: "Elevador", subtipos: [] },
     ],
-    itens: {
-      redler: ["sensor_rotacao", "sensor_temperatura", "sensor_embuchamento"],
-      correia: ["sensor_rotacao", "sensor_temperatura", "sensor_embuchamento", "sensor_desalinhamento", "janela_alivio_pressao", "filtro_pontual"],
-      hi_flight: ["sensor_rotacao", "sensor_temperatura", "sensor_embuchamento"],
-      helicoidal: [],
-      elevador: [
-        "sensor_rotacao",
-        "sensor_temperatura",
-        "sensor_embuchamento",
-        "sensor_desalinhamento",
-        "modulo_alivio_pressao",
-        "pe_auto_limpante",
-        "plataforma_valvula_2_vias",
-      ],
-    },
-    detalhes: {
-      sensor_rotacao: { label: "Sensor de Rotação", categoria: "sensor" },
-      sensor_temperatura: { label: "Sensor de Temperatura", categoria: "sensor" },
-      sensor_embuchamento: { label: "Sensor de Embuchamento", categoria: "sensor" },
-      sensor_desalinhamento: { label: "Sensor de Desalinhamento", categoria: "sensor" },
-      janela_alivio_pressao: { label: "Janela de Alívio de Pressão", categoria: "acessorio" },
-      filtro_pontual: { label: "Filtro Pontual", categoria: "acessorio" },
-      modulo_alivio_pressao: { label: "Módulo de Alívio de Pressão", categoria: "acessorio" },
-      pe_auto_limpante: { label: "Pé Auto-Limpante", categoria: "acessorio" },
-      plataforma_valvula_2_vias: { label: "Plataforma p/ manutenção de válvula 2 vias", categoria: "acessorio" },
-    },
   };
 
   const maquinaLimpezaConfig = {
@@ -1049,137 +1023,207 @@
     return input;
   }
 
-  function renderTransportadorOptions() {
-    const state = transportadorCamposIniciais();
+  function transportadorCamposIniciaisV2() {
+    const transportadores = Array.isArray(selectedCampos.transportadores) ? selectedCampos.transportadores : [];
+    if (transportadores.length) {
+      return {
+        transportadores: transportadores.reduce((map, item) => {
+          if (!item.tipo) return map;
+          map[item.tipo] = {
+            subtipo: item.subtipo || "",
+            quantidade: item.quantidade || 1,
+            observacao: item.observacao || "",
+            peAutoLimpante: item.pe_auto_limpante || "nao",
+          };
+          return map;
+        }, {}),
+      };
+    }
+    if (selectedCampos.tipo) {
+      return {
+        transportadores: {
+          [selectedCampos.tipo]: {
+            subtipo: selectedCampos.subtipo || "",
+            quantidade: 1,
+            observacao: "",
+            peAutoLimpante: (selectedCampos.sensores_acessorios || []).some((item) => item.chave === "pe_auto_limpante") ? "sim" : "nao",
+          },
+        },
+      };
+    }
+    return { transportadores: {} };
+  }
 
-    function tipoCompleto() {
-      const tipo = transportadorTipo(state.tipo);
-      if (!tipo) return false;
-      return !tipo.subtipos.length || Boolean(state.subtipo);
+  function renderTransportadorOptions() {
+    const state = transportadorCamposIniciaisV2();
+
+    function selectedTipos() {
+      return Object.keys(state.transportadores);
     }
 
     function isComplete() {
-      return Boolean(state.tipo && tipoCompleto());
+      const tipos = selectedTipos();
+      if (!tipos.length) return false;
+      return tipos.every((tipoValue) => {
+        const tipo = transportadorTipo(tipoValue);
+        const dados = state.transportadores[tipoValue];
+        return tipo && dados && Number(dados.quantidade || 0) > 0 && (!tipo.subtipos.length || Boolean(dados.subtipo));
+      });
     }
 
-    function cleanIncompatibleItems() {
-      const permitidos = new Set(transportadorConfig.itens[state.tipo] || []);
-      state.itens = state.itens.filter((item) => permitidos.has(item));
-      Object.keys(state.obs).forEach((key) => {
-        if (!permitidos.has(key)) delete state.obs[key];
-      });
+    function toggleTipo(tipoValue) {
+      if (state.transportadores[tipoValue]) {
+        delete state.transportadores[tipoValue];
+      } else {
+        state.transportadores[tipoValue] = {
+          subtipo: "",
+          quantidade: 1,
+          observacao: "",
+          peAutoLimpante: "nao",
+        };
+      }
     }
 
     function renderHiddenFields(container) {
-      container.appendChild(hiddenInput("transportador_tipo", state.tipo));
-      container.appendChild(hiddenInput("transportador_subtipo", state.subtipo));
-      state.itens.forEach((item) => {
-        container.appendChild(hiddenInput("transportador_item", item));
-        container.appendChild(hiddenInput(`transportador_obs__${item}`, state.obs[item] || ""));
+      selectedTipos().forEach((tipoValue) => {
+        const dados = state.transportadores[tipoValue];
+        container.appendChild(hiddenInput("transportador_tipo", tipoValue));
+        container.appendChild(hiddenInput(`transportador_subtipo__${tipoValue}`, dados.subtipo));
+        container.appendChild(hiddenInput(`transportador_quantidade__${tipoValue}`, dados.quantidade));
+        container.appendChild(hiddenInput(`transportador_obs__${tipoValue}`, dados.observacao));
+        if (tipoValue === "elevador") {
+          container.appendChild(hiddenInput("transportador_pe_auto_limpante__elevador", dados.peAutoLimpante));
+        }
       });
     }
 
-    function renderStep(titleText, choices, currentValue, onChange) {
+    function renderTipoSelector() {
       const step = document.createElement("section");
       step.className = "fluxo-step";
       const title = document.createElement("h4");
-      title.textContent = titleText;
+      title.textContent = "Tipos de transportadores";
       step.appendChild(title);
       const grid = document.createElement("div");
       grid.className = "choice-card-grid";
-      choices.forEach((choice) => {
-        grid.appendChild(makeFluxoCard(choice.label, choice.value, currentValue === choice.value, () => onChange(choice.value)));
+      transportadorConfig.tipos.forEach((choice) => {
+        grid.appendChild(makeFluxoCard(choice.label, choice.value, Boolean(state.transportadores[choice.value]), () => {
+          toggleTipo(choice.value);
+          rerender();
+        }));
       });
       step.appendChild(grid);
       return step;
     }
 
-    function renderChecklist() {
+    function renderTransportadorCard(tipoValue) {
+      const tipo = transportadorTipo(tipoValue);
+      const dados = state.transportadores[tipoValue];
       const step = document.createElement("section");
-      step.className = "fluxo-step";
+      step.className = "transportador-config-card";
       const title = document.createElement("h4");
-      title.textContent = "Sensores e acessórios compatíveis";
+      title.textContent = tipo.label;
       step.appendChild(title);
-      const itens = transportadorConfig.itens[state.tipo] || [];
-      if (!itens.length) {
-        const empty = document.createElement("p");
-        empty.className = "muted";
-        empty.textContent = "Nenhum sensor/acessório por enquanto.";
-        step.appendChild(empty);
-        return step;
-      }
-      const list = document.createElement("div");
-      list.className = "transport-checklist";
-      itens.forEach((key) => {
-        const detail = transportadorConfig.detalhes[key];
-        const row = document.createElement("div");
-        row.className = "transport-check-card";
-        row.dataset.checked = state.itens.includes(key) ? "true" : "false";
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = detail.label;
-        button.addEventListener("click", () => {
-          if (state.itens.includes(key)) {
-            state.itens = state.itens.filter((item) => item !== key);
-            delete state.obs[key];
-          } else {
-            state.itens.push(key);
-          }
+
+      const grid = document.createElement("div");
+      grid.className = "transportador-config-grid";
+
+      const quantidadeLabel = document.createElement("label");
+      quantidadeLabel.textContent = "Quantidade";
+      const quantidade = document.createElement("input");
+      quantidade.type = "number";
+      quantidade.min = "1";
+      quantidade.step = "1";
+      quantidade.value = dados.quantidade || 1;
+      quantidade.addEventListener("input", () => {
+        dados.quantidade = quantidade.value || 1;
+        const hidden = optionsBox.querySelector(`[name="transportador_quantidade__${tipoValue}"]`);
+        if (hidden) hidden.value = dados.quantidade;
+        setFinalFieldsVisible(isComplete());
+      });
+      quantidadeLabel.appendChild(quantidade);
+      grid.appendChild(quantidadeLabel);
+
+      if (tipo.subtipos.length) {
+        const subtipoLabel = document.createElement("label");
+        subtipoLabel.textContent = "Subtipo";
+        const select = document.createElement("select");
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "Selecione";
+        select.appendChild(empty);
+        tipo.subtipos.forEach((subtipo) => {
+          const option = document.createElement("option");
+          option.value = subtipo.value;
+          option.textContent = subtipo.label;
+          option.selected = dados.subtipo === subtipo.value;
+          select.appendChild(option);
+        });
+        select.addEventListener("change", () => {
+          dados.subtipo = select.value;
           rerender();
         });
-        const obs = document.createElement("input");
-        obs.placeholder = "Observação";
-        obs.value = state.obs[key] || "";
-        obs.disabled = !state.itens.includes(key);
-        obs.addEventListener("input", () => {
-          state.obs[key] = obs.value;
-          const hiddenObs = optionsBox.querySelector(`[name="transportador_obs__${key}"]`);
-          if (hiddenObs) hiddenObs.value = obs.value;
+        subtipoLabel.appendChild(select);
+        grid.appendChild(subtipoLabel);
+      }
+
+      if (tipoValue === "elevador") {
+        const peLabel = document.createElement("label");
+        peLabel.textContent = "Pe autolimpante";
+        const select = document.createElement("select");
+        [
+          { value: "nao", label: "Nao" },
+          { value: "sim", label: "Sim" },
+        ].forEach((optionData) => {
+          const option = document.createElement("option");
+          option.value = optionData.value;
+          option.textContent = optionData.label;
+          option.selected = dados.peAutoLimpante === optionData.value;
+          select.appendChild(option);
         });
-        row.appendChild(button);
-        row.appendChild(obs);
-        list.appendChild(row);
+        select.addEventListener("change", () => {
+          dados.peAutoLimpante = select.value;
+          const hidden = optionsBox.querySelector('[name="transportador_pe_auto_limpante__elevador"]');
+          if (hidden) hidden.value = dados.peAutoLimpante;
+        });
+        peLabel.appendChild(select);
+        grid.appendChild(peLabel);
+      }
+
+      const obsLabel = document.createElement("label");
+      obsLabel.className = "full";
+      obsLabel.textContent = "Observacao";
+      const obs = document.createElement("input");
+      obs.value = dados.observacao || "";
+      obs.placeholder = "Opcional";
+      obs.addEventListener("input", () => {
+        dados.observacao = obs.value;
+        const hidden = optionsBox.querySelector(`[name="transportador_obs__${tipoValue}"]`);
+        if (hidden) hidden.value = dados.observacao;
       });
-      step.appendChild(list);
+      obsLabel.appendChild(obs);
+      grid.appendChild(obsLabel);
+
+      step.appendChild(grid);
       return step;
     }
 
     function rerender() {
-      cleanIncompatibleItems();
       optionsBox.innerHTML = "";
       setFinalFieldsVisible(isComplete());
       const wrap = document.createElement("div");
       wrap.className = "fluxo-wizard";
       const title = document.createElement("h3");
-      title.textContent = "Adicionar Transportador";
+      title.textContent = "Adicionar Transportadores";
       wrap.appendChild(title);
       renderHiddenFields(wrap);
+      wrap.appendChild(renderTipoSelector());
 
-      wrap.appendChild(
-        renderStep("Etapa 1 - Tipo de Transportador", transportadorConfig.tipos, state.tipo, (value) => {
-          state.tipo = value;
-          state.subtipo = "";
-          state.itens = [];
-          state.obs = {};
-          rerender();
-        })
-      );
-
-      const tipo = transportadorTipo(state.tipo);
-      if (tipo && tipo.subtipos.length) {
-        wrap.appendChild(
-          renderStep("Etapa 2 - Subtipo", tipo.subtipos, state.subtipo, (value) => {
-            state.subtipo = value;
-            state.itens = [];
-            state.obs = {};
-            rerender();
-          })
-        );
-      }
-
-      if (state.tipo && tipoCompleto()) {
-        wrap.appendChild(renderChecklist());
-      }
+      const cards = document.createElement("div");
+      cards.className = "transportador-config-list";
+      selectedTipos().forEach((tipoValue) => {
+        cards.appendChild(renderTransportadorCard(tipoValue));
+      });
+      if (cards.children.length) wrap.appendChild(cards);
 
       optionsBox.appendChild(wrap);
     }
