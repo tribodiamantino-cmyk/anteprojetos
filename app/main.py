@@ -305,8 +305,7 @@ def resumo_transportador(campos):
         for item in transportadores:
             tipo = item.get("tipo_rotulo") or item.get("tipo") or "-"
             subtipo = item.get("subtipo_rotulo") or ""
-            quantidade = item.get("quantidade") or 1
-            descricao = f"{quantidade}x {' '.join(part for part in [tipo, subtipo] if part).strip()}"
+            descricao = " ".join(part for part in [tipo, subtipo] if part).strip()
             if item.get("pe_auto_limpante") == "sim":
                 descricao += " com pe autolimpante"
             if item.get("observacao"):
@@ -678,17 +677,11 @@ def collect_transportador_campos(form):
         if tipo not in TRANSPORTADOR_TIPOS:
             continue
         subtipo = (form.get(f"transportador_subtipo__{tipo}") or "").strip()
-        quantidade_raw = (form.get(f"transportador_quantidade__{tipo}") or "1").strip()
-        try:
-            quantidade = max(1, int(quantidade_raw))
-        except ValueError:
-            quantidade = 1
         item = {
             "tipo": tipo,
             "tipo_rotulo": TRANSPORTADOR_TIPOS.get(tipo, tipo),
             "subtipo": subtipo,
             "subtipo_rotulo": TRANSPORTADOR_SUBTIPOS.get(subtipo, ""),
-            "quantidade": quantidade,
             "observacao": (form.get(f"transportador_obs__{tipo}") or "").strip(),
         }
         if tipo == "elevador":
@@ -797,8 +790,7 @@ def detalhes_relatorio_item(item):
                 tipo = " ".join(
                     part for part in [item_transportador.get("tipo_rotulo"), item_transportador.get("subtipo_rotulo")] if part
                 )
-                quantidade = item_transportador.get("quantidade") or 1
-                detalhes.append((f"{tipo} - quantidade", quantidade))
+                detalhes.append(("Tipo aplicado", tipo))
                 if item_transportador.get("pe_auto_limpante") == "sim":
                     detalhes.append((f"{tipo} - pé autolimpante", "Sim"))
                 if item_transportador.get("observacao"):

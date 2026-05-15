@@ -1031,7 +1031,6 @@
           if (!item.tipo) return map;
           map[item.tipo] = {
             subtipo: item.subtipo || "",
-            quantidade: item.quantidade || 1,
             observacao: item.observacao || "",
             peAutoLimpante: item.pe_auto_limpante || "nao",
           };
@@ -1044,7 +1043,6 @@
         transportadores: {
           [selectedCampos.tipo]: {
             subtipo: selectedCampos.subtipo || "",
-            quantidade: 1,
             observacao: "",
             peAutoLimpante: (selectedCampos.sensores_acessorios || []).some((item) => item.chave === "pe_auto_limpante") ? "sim" : "nao",
           },
@@ -1067,7 +1065,7 @@
       return tipos.every((tipoValue) => {
         const tipo = transportadorTipo(tipoValue);
         const dados = state.transportadores[tipoValue];
-        return tipo && dados && Number(dados.quantidade || 0) > 0 && (!tipo.subtipos.length || Boolean(dados.subtipo));
+        return tipo && dados && (!tipo.subtipos.length || Boolean(dados.subtipo));
       });
     }
 
@@ -1077,7 +1075,6 @@
       } else {
         state.transportadores[tipoValue] = {
           subtipo: "",
-          quantidade: 1,
           observacao: "",
           peAutoLimpante: "nao",
         };
@@ -1089,7 +1086,6 @@
         const dados = state.transportadores[tipoValue];
         container.appendChild(hiddenInput("transportador_tipo", tipoValue));
         container.appendChild(hiddenInput(`transportador_subtipo__${tipoValue}`, dados.subtipo));
-        container.appendChild(hiddenInput(`transportador_quantidade__${tipoValue}`, dados.quantidade));
         container.appendChild(hiddenInput(`transportador_obs__${tipoValue}`, dados.observacao));
         if (tipoValue === "elevador") {
           container.appendChild(hiddenInput("transportador_pe_auto_limpante__elevador", dados.peAutoLimpante));
@@ -1126,22 +1122,6 @@
 
       const grid = document.createElement("div");
       grid.className = "transportador-config-grid";
-
-      const quantidadeLabel = document.createElement("label");
-      quantidadeLabel.textContent = "Quantidade";
-      const quantidade = document.createElement("input");
-      quantidade.type = "number";
-      quantidade.min = "1";
-      quantidade.step = "1";
-      quantidade.value = dados.quantidade || 1;
-      quantidade.addEventListener("input", () => {
-        dados.quantidade = quantidade.value || 1;
-        const hidden = optionsBox.querySelector(`[name="transportador_quantidade__${tipoValue}"]`);
-        if (hidden) hidden.value = dados.quantidade;
-        setFinalFieldsVisible(isComplete());
-      });
-      quantidadeLabel.appendChild(quantidade);
-      grid.appendChild(quantidadeLabel);
 
       if (tipo.subtipos.length) {
         const subtipoLabel = document.createElement("label");
