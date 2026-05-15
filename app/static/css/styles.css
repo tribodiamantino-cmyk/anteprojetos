@@ -1159,7 +1159,14 @@ legend {
 }
 
 .report-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 10px;
   margin-top: 12px;
+}
+
+.report-items > h2 {
+  grid-column: 1 / -1;
 }
 
 .report-group {
@@ -1175,7 +1182,7 @@ legend {
 
 .report-item-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
@@ -1303,10 +1310,12 @@ legend {
 
   .report-footer,
   .report-item-head,
-  .report-item-list {
+  .report-item-list,
+  .report-items {
     flex-direction: column;
   }
 
+  .report-items,
   .report-item-list {
     grid-template-columns: 1fr;
   }
@@ -1433,8 +1442,18 @@ legend {
 
   .report-item-list {
     display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: 1fr !important;
     gap: 6px;
+  }
+
+  .report-items {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    column-gap: 6px;
+  }
+
+  .report-items > h2 {
+    grid-column: 1 / -1 !important;
   }
 
   .report-item-card + .report-item-card {
