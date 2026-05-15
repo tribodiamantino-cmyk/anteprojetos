@@ -44,7 +44,7 @@ STATUS_GERA_VERSAO = {
     "Finalizado": "Aprovacao/finalizacao",
     "Cancelado": "Cancelamento",
 }
-TIPO_OBRA_OPCOES = ["Obra nova", "Reforma"]
+TIPO_OBRA_OPCOES = ["Obra nova", "Reforma", "Ampliação"]
 TIPO_DEFINICAO_OPCOES = ["Ja definido", "Parcialmente definido", "Engenharia dimensionar"]
 SITUACAO_REFORMA_OPCOES = ["Novo", "Existente", "Substituir", "Adequar", "Remover"]
 TIPOS_CAMPO_EQUIPAMENTO = ["text", "number", "select", "checkbox", "textarea", "info"]

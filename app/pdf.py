@@ -77,7 +77,7 @@ def gerar_pdf_anteprojeto(anteprojeto, itens):
 
     dados = [
         ["Cliente", anteprojeto["cliente"]],
-        ["Obra/local", anteprojeto["obra_local"]],
+        ["Cidade", anteprojeto["obra_local"]],
         ["Tipo da obra", anteprojeto["tipo_obra"]],
         ["Responsavel", anteprojeto["responsavel"]],
         ["Status", anteprojeto["status"]],

@@ -35,7 +35,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cliente TEXT NOT NULL,
                 obra_local TEXT NOT NULL,
-                tipo_obra TEXT NOT NULL CHECK (tipo_obra IN ('Obra nova', 'Reforma')),
+                tipo_obra TEXT NOT NULL CHECK (tipo_obra IN ('Obra nova', 'Reforma', 'Ampliação')),
                 responsavel TEXT NOT NULL,
                 observacoes_gerais TEXT,
                 status TEXT NOT NULL,
@@ -185,6 +185,7 @@ def init_db():
             );
             """
         )
+        migrate_tipo_obra_ampliacao(conn)
         migrate_equipamentos(conn)
         seed_equipamentos(conn)
         ensure_default_equipamentos(conn)
@@ -195,6 +196,43 @@ def init_db():
 def column_exists(conn, table, column):
     columns = conn.execute(f"PRAGMA table_info({table})").fetchall()
     return any(row["name"] == column for row in columns)
+
+
+def migrate_tipo_obra_ampliacao(conn):
+    table = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'anteprojetos'"
+    ).fetchone()
+    create_sql = table["sql"] if table else ""
+    if "Ampliação" in create_sql:
+        return
+
+    conn.execute("PRAGMA foreign_keys = OFF")
+    conn.execute(
+        """
+        CREATE TABLE anteprojetos_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cliente TEXT NOT NULL,
+            obra_local TEXT NOT NULL,
+            tipo_obra TEXT NOT NULL CHECK (tipo_obra IN ('Obra nova', 'Reforma', 'Ampliação')),
+            responsavel TEXT NOT NULL,
+            observacoes_gerais TEXT,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO anteprojetos_new
+        (id, cliente, obra_local, tipo_obra, responsavel, observacoes_gerais, status, created_at, updated_at)
+        SELECT id, cliente, obra_local, tipo_obra, responsavel, observacoes_gerais, status, created_at, updated_at
+        FROM anteprojetos
+        """
+    )
+    conn.execute("DROP TABLE anteprojetos")
+    conn.execute("ALTER TABLE anteprojetos_new RENAME TO anteprojetos")
+    conn.execute("PRAGMA foreign_keys = ON")
 
 
 def migrate_equipamentos(conn):
