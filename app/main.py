@@ -196,6 +196,7 @@ def parse_item(row):
     item["campos"] = json.loads(item["campos_json"] or "{}")
     item["opcoes"] = []
     item["resumo_engenharia"] = ""
+    item["resumo_moega"] = ""
     item["resumo_fluxo"] = ""
     item["resumo_transportador"] = ""
     item["resumo_maquina_limpeza"] = ""
@@ -207,19 +208,21 @@ def parse_item(row):
 
 
 def equipamento_nome_exibicao(nome):
-    if nome == "Item 1 - Fluxo":
+    if nome == "Item 1 - Moega":
+        return "Moega"
+    if nome in ("Item 1 - Fluxo", "Item 2 - Fluxo"):
         return "Fluxo"
-    if nome == "Item 2 - Transportadores":
+    if nome in ("Item 2 - Transportadores", "Item 3 - Transportadores"):
         return "Transportador"
-    if nome == "Item 3 - Máquina de Limpeza Grain Cleaner EC":
+    if nome in ("Item 3 - Máquina de Limpeza Grain Cleaner EC", "Item 4 - Máquina de Limpeza Grain Cleaner EC"):
         return "Máquina de Limpeza Grain Cleaner EC"
-    if nome == "Item 4 - Secadores Process Dryer":
+    if nome in ("Item 4 - Secadores Process Dryer", "Item 5 - Secadores Process Dryer"):
         return "Secador Process Dryer"
-    if nome == "Item 5 - Silo Pulmão Elevado":
+    if nome in ("Item 5 - Silo Pulmão Elevado", "Item 6 - Silo Pulmão Elevado"):
         return "Silo Pulmão Elevado"
-    if nome == "Item 6 - Silo Fundo Plano":
+    if nome in ("Item 6 - Silo Fundo Plano", "Item 7 - Silo Fundo Plano"):
         return "Silo Fundo Plano"
-    if nome == "Item 7 - Expedição":
+    if nome in ("Item 7 - Expedição", "Item 8 - Expedição"):
         return "Expedição"
     return nome
 
@@ -288,14 +291,25 @@ def resumo_fluxo(opcoes):
     tipo = dados.get("tipo_fluxo", {}).get("valor_rotulo") or "-"
     graos = dados.get("fluxo_graos", {}).get("valor_rotulo") or "-"
     impurezas_habilitado = dados.get("fluxo_impurezas_habilitado", {}).get("valor") == "sim"
-    moega = dados.get("moega", {}).get("valor_rotulo") or "-"
     canalizacao = dados.get("canalizacao_sugerida", {}).get("valor_rotulo") or "-"
     if impurezas_habilitado:
-        impurezas_valor = dados.get("fluxo_impurezas", {}).get("valor_rotulo") or "-"
+        impurezas_valor = dados.get("fluxo_impurezas", {}).get("valor_rotulo") or dados.get("fluxo_impurezas", {}).get("valor") or "-"
         impurezas = f"Sim - {impurezas_valor}"
     else:
         impurezas = "Não"
-    return f"Fluxo | Tipo: {tipo} | Grãos: {graos} | Canalização: {canalizacao} | Impurezas: {impurezas} | Moega: {moega}"
+    return f"Fluxo | Tipo: {tipo} | Grãos: {graos} | Canalização: {canalizacao} | Impurezas: {impurezas}"
+
+
+def resumo_moega(opcoes):
+    dados = {opcao["opcao_chave"]: opcao for opcao in opcoes}
+    tipo = dados.get("tipo_moega", {}).get("valor_rotulo") or "-"
+    capacidade = dados.get("capacidade_moega", {}).get("valor_rotulo") or dados.get("capacidade_moega", {}).get("valor") or "-"
+    tombador = dados.get("prever_tombador", {}).get("valor_rotulo") or dados.get("prever_tombador", {}).get("valor") or "-"
+    if tombador == "sim":
+        tombador = "Sim"
+    elif tombador == "nao":
+        tombador = "Não"
+    return f"Moega | Tipo: {tipo} | Capacidade: {capacidade} | Prever tombador: {tombador}"
 
 
 def resumo_transportador(campos):
@@ -718,29 +732,33 @@ def carregar_opcoes_itens(conn, itens):
         if item["campos"].get("modo_definicao") == "engenharia":
             item["equipamento_nome"] = equipamento_nome_exibicao(item["equipamento_nome"])
             item["resumo_engenharia"] = resumo_engenharia(item)
-        elif item["equipamento_nome"] in ("Fluxo", "Item 1 - Fluxo"):
+        elif item["equipamento_nome"] in ("Moega", "Item 1 - Moega"):
+            item["equipamento_nome"] = "Moega"
+            item["resumo_moega"] = resumo_moega(item["opcoes"])
+        elif item["equipamento_nome"] in ("Fluxo", "Item 1 - Fluxo", "Item 2 - Fluxo"):
             item["equipamento_nome"] = "Fluxo"
             item["opcoes"] = aplicar_canalizacao_fluxo(item["opcoes"])
             item["resumo_fluxo"] = resumo_fluxo(item["opcoes"])
-        elif item["equipamento_nome"] in ("Transportador", "Item 2 - Transportadores"):
+        elif item["equipamento_nome"] in ("Transportador", "Item 2 - Transportadores", "Item 3 - Transportadores"):
             item["equipamento_nome"] = "Transportador"
             item["resumo_transportador"] = resumo_transportador(item["campos"])
         elif item["equipamento_nome"] in (
             "Máquina de Limpeza Grain Cleaner EC",
             "Item 3 - Máquina de Limpeza Grain Cleaner EC",
+            "Item 4 - Máquina de Limpeza Grain Cleaner EC",
         ):
             item["equipamento_nome"] = "Máquina de Limpeza Grain Cleaner EC"
             item["resumo_maquina_limpeza"] = resumo_maquina_limpeza(item["campos"])
-        elif item["equipamento_nome"] in ("Secador Process Dryer", "Item 4 - Secadores Process Dryer"):
+        elif item["equipamento_nome"] in ("Secador Process Dryer", "Item 4 - Secadores Process Dryer", "Item 5 - Secadores Process Dryer"):
             item["equipamento_nome"] = "Secador Process Dryer"
             item["resumo_secador"] = resumo_secador(item["campos"])
-        elif item["equipamento_nome"] in ("Silo Pulmão Elevado", "Item 5 - Silo Pulmão Elevado"):
+        elif item["equipamento_nome"] in ("Silo Pulmão Elevado", "Item 5 - Silo Pulmão Elevado", "Item 6 - Silo Pulmão Elevado"):
             item["equipamento_nome"] = "Silo Pulmão Elevado"
             item["resumo_silo_pulmao"] = resumo_silo_pulmao(item["campos"])
-        elif item["equipamento_nome"] in ("Silo Fundo Plano", "Item 6 - Silo Fundo Plano"):
+        elif item["equipamento_nome"] in ("Silo Fundo Plano", "Item 6 - Silo Fundo Plano", "Item 7 - Silo Fundo Plano"):
             item["equipamento_nome"] = "Silo Fundo Plano"
             item["resumo_silo_fundo_plano"] = resumo_silo_fundo_plano(item["campos"])
-        elif item["equipamento_nome"] in ("Expedição", "Item 7 - Expedição"):
+        elif item["equipamento_nome"] in ("Expedição", "Item 7 - Expedição", "Item 8 - Expedição"):
             item["equipamento_nome"] = "Expedição"
             item["resumo_expedicao"] = resumo_expedicao(item["campos"])
     return itens
@@ -776,6 +794,13 @@ def detalhes_relatorio_item(item):
 
     nome = item.get("equipamento_nome") or ""
     detalhes = []
+    if nome == "Moega":
+        for opcao in item.get("opcoes") or []:
+            valor = opcao.get("valor_rotulo") or opcao.get("valor")
+            if valor:
+                detalhes.append((opcao.get("opcao_nome") or "Opção", valor))
+        return detalhes
+
     if nome == "Fluxo":
         for opcao in item.get("opcoes") or []:
             valor = opcao.get("valor_rotulo") or opcao.get("valor")
@@ -898,6 +923,7 @@ def observacoes_automaticas(itens):
 
 def preparar_relatorio_anteprojeto(anteprojeto, itens):
     grupos_ordem = [
+        "Moega",
         "Fluxo",
         "Transportador",
         "Máquina de Limpeza Grain Cleaner EC",
@@ -907,6 +933,7 @@ def preparar_relatorio_anteprojeto(anteprojeto, itens):
         "Expedição",
     ]
     grupos_titulos = {
+        "Moega": "Moega",
         "Transportador": "Transportadores",
         "Máquina de Limpeza Grain Cleaner EC": "Máquinas de Limpeza",
         "Secador Process Dryer": "Secadores",
@@ -2059,13 +2086,14 @@ def editar_anteprojeto(
             SELECT
                 id,
                 CASE
-                    WHEN nome = 'Item 1 - Fluxo' THEN 'Fluxo'
-                    WHEN nome = 'Item 2 - Transportadores' THEN 'Transportadores'
-                    WHEN nome = 'Item 3 - Máquina de Limpeza Grain Cleaner EC' THEN 'Máquina de Limpeza Grain Cleaner EC'
-                    WHEN nome = 'Item 4 - Secadores Process Dryer' THEN 'Secadores Process Dryer'
-                    WHEN nome = 'Item 5 - Silo Pulmão Elevado' THEN 'Silo Pulmão Elevado'
-                    WHEN nome = 'Item 6 - Silo Fundo Plano' THEN 'Silo Fundo Plano'
-                    WHEN nome = 'Item 7 - Expedição' THEN 'Expedição'
+                    WHEN nome = 'Item 1 - Moega' THEN 'Moega'
+                    WHEN nome = 'Item 2 - Fluxo' THEN 'Fluxo'
+                    WHEN nome = 'Item 3 - Transportadores' THEN 'Transportadores'
+                    WHEN nome = 'Item 4 - Máquina de Limpeza Grain Cleaner EC' THEN 'Máquina de Limpeza Grain Cleaner EC'
+                    WHEN nome = 'Item 5 - Secadores Process Dryer' THEN 'Secadores Process Dryer'
+                    WHEN nome = 'Item 6 - Silo Pulmão Elevado' THEN 'Silo Pulmão Elevado'
+                    WHEN nome = 'Item 7 - Silo Fundo Plano' THEN 'Silo Fundo Plano'
+                    WHEN nome = 'Item 8 - Expedição' THEN 'Expedição'
                     ELSE nome
                 END AS nome,
                 nome AS cadastro_nome
@@ -2224,17 +2252,17 @@ async def salvar_item(request: Request, anteprojeto_id: int):
             situacao = "Novo"
         if modo_definicao == "engenharia":
             campos = collect_engenharia_campos(form)
-        elif equipamento["nome"] == "Item 2 - Transportadores":
+        elif equipamento["nome"] == "Item 3 - Transportadores":
             campos = collect_transportador_campos(form)
-        elif equipamento["nome"] == "Item 3 - Máquina de Limpeza Grain Cleaner EC":
+        elif equipamento["nome"] == "Item 4 - Máquina de Limpeza Grain Cleaner EC":
             campos = collect_maquina_limpeza_campos(form)
-        elif equipamento["nome"] == "Item 4 - Secadores Process Dryer":
+        elif equipamento["nome"] == "Item 5 - Secadores Process Dryer":
             campos = collect_secador_campos(form)
-        elif equipamento["nome"] == "Item 5 - Silo Pulmão Elevado":
+        elif equipamento["nome"] == "Item 6 - Silo Pulmão Elevado":
             campos = collect_silo_pulmao_campos(form)
-        elif equipamento["nome"] == "Item 6 - Silo Fundo Plano":
+        elif equipamento["nome"] == "Item 7 - Silo Fundo Plano":
             campos = collect_silo_fundo_plano_campos(form)
-        elif equipamento["nome"] == "Item 7 - Expedição":
+        elif equipamento["nome"] == "Item 8 - Expedição":
             campos = collect_expedicao_campos(form)
         else:
             campos = collect_campos(form, schema)

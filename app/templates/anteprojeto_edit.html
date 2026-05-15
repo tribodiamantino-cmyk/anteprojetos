@@ -160,6 +160,8 @@
             {% if item.observacao_inicial %}<p><strong>Obs. inicial:</strong> {{ item.observacao_inicial }}</p>{% endif %}
             {% if item.resumo_engenharia %}
             <p class="item-summary-line">{{ item.resumo_engenharia }}</p>
+            {% elif item.resumo_moega %}
+            <p class="item-summary-line">{{ item.resumo_moega }}</p>
             {% elif item.resumo_fluxo %}
             <p class="item-summary-line">{{ item.resumo_fluxo }}</p>
             {% elif item.resumo_transportador %}

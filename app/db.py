@@ -413,29 +413,32 @@ def seed_equipamentos(conn):
 
 
 def ensure_default_equipamentos(conn):
-    ensure_item1_fluxo(conn)
-    ensure_item2_transportadores(conn)
-    ensure_item3_maquina_limpeza(conn)
-    ensure_item4_secadores(conn)
-    ensure_item5_silo_pulmao(conn)
-    ensure_item6_silo_fundo_plano(conn)
-    ensure_item7_expedicao(conn)
+    migrate_default_equipment_order(conn)
+    ensure_item1_moega(conn)
+    ensure_item2_fluxo(conn)
+    ensure_item3_transportadores(conn)
+    ensure_item4_maquina_limpeza(conn)
+    ensure_item5_secadores(conn)
+    ensure_item6_silo_pulmao(conn)
+    ensure_item7_silo_fundo_plano(conn)
+    ensure_item8_expedicao(conn)
 
 
 def prune_equipamentos_to_default_items(conn):
     permitidos = conn.execute(
         """
         SELECT id FROM equipamentos_modelo
-        WHERE nome IN (?, ?, ?, ?, ?, ?, ?)
+        WHERE nome IN (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            "Item 1 - Fluxo",
-            "Item 2 - Transportadores",
-            "Item 3 - Máquina de Limpeza Grain Cleaner EC",
-            "Item 4 - Secadores Process Dryer",
-            "Item 5 - Silo Pulmão Elevado",
-            "Item 6 - Silo Fundo Plano",
-            "Item 7 - Expedição",
+            "Item 1 - Moega",
+            "Item 2 - Fluxo",
+            "Item 3 - Transportadores",
+            "Item 4 - Máquina de Limpeza Grain Cleaner EC",
+            "Item 5 - Secadores Process Dryer",
+            "Item 6 - Silo Pulmão Elevado",
+            "Item 7 - Silo Fundo Plano",
+            "Item 8 - Expedição",
         ),
     ).fetchall()
     permitidos_ids = [row["id"] for row in permitidos]
@@ -479,8 +482,115 @@ def prune_equipamentos_to_default_items(conn):
     conn.execute(f"DELETE FROM equipamentos_modelo WHERE id IN ({placeholders})", tuple(removidos_ids))
 
 
-def ensure_item1_fluxo(conn):
-    nome = "Item 1 - Fluxo"
+def migrate_default_equipment_order(conn):
+    renames = [
+        ("Item 1 - Fluxo", "Item 2 - Fluxo"),
+        ("Item 2 - Transportadores", "Item 3 - Transportadores"),
+        ("Item 3 - Máquina de Limpeza Grain Cleaner EC", "Item 4 - Máquina de Limpeza Grain Cleaner EC"),
+        ("Item 4 - Secadores Process Dryer", "Item 5 - Secadores Process Dryer"),
+        ("Item 5 - Silo Pulmão Elevado", "Item 6 - Silo Pulmão Elevado"),
+        ("Item 6 - Silo Fundo Plano", "Item 7 - Silo Fundo Plano"),
+        ("Item 7 - Expedição", "Item 8 - Expedição"),
+    ]
+    for old, new in renames:
+        row = conn.execute("SELECT id FROM equipamentos_modelo WHERE nome = ?", (old,)).fetchone()
+        if not row:
+            continue
+        temp_name = f"__migrando__{new}"
+        conn.execute("UPDATE equipamentos_modelo SET nome = ? WHERE id = ?", (temp_name, row["id"]))
+        conn.execute("UPDATE itens_anteprojeto SET equipamento_nome = ? WHERE equipamento_nome = ?", (temp_name, old))
+    for _old, new in renames:
+        temp_name = f"__migrando__{new}"
+        conn.execute("UPDATE equipamentos_modelo SET nome = ? WHERE nome = ?", (new, temp_name))
+        conn.execute("UPDATE itens_anteprojeto SET equipamento_nome = ? WHERE equipamento_nome = ?", (new, temp_name))
+
+
+def ensure_item1_moega(conn):
+    nome = "Item 1 - Moega"
+    schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
+    equipamento = conn.execute(
+        "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
+        (nome,),
+    ).fetchone()
+
+    if equipamento:
+        equipamento_id = equipamento["id"]
+        conn.execute(
+            """
+            UPDATE equipamentos_modelo
+            SET descricao = ?, categoria = ?, subcategoria = ?, fabricante = ?,
+                modelo = ?, schema_json = ?, ativo = 1,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                "Configuracao da moega de recepcao do anteprojeto.",
+                "Configuracao",
+                "Moega",
+                "",
+                "",
+                schema_json,
+                equipamento_id,
+            ),
+        )
+    else:
+        cur = conn.execute(
+            """
+            INSERT INTO equipamentos_modelo
+            (parent_id, nome, descricao, categoria, subcategoria, fabricante, modelo, schema_json, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                None,
+                nome,
+                "Configuracao da moega de recepcao do anteprojeto.",
+                "Configuracao",
+                "Moega",
+                "",
+                "",
+                schema_json,
+                1,
+            ),
+        )
+        equipamento_id = cur.lastrowid
+
+    upsert_opcao_equipamento(
+        conn,
+        equipamento_id,
+        nome="Tipo de Moega",
+        chave="tipo_moega",
+        tipo="selecao",
+        valores=[
+            ("simples", "Simples"),
+            ("dupla_poco_central", "Dupla (Poço Central)"),
+            ("paralela_tunel_inferior", "Paralela (Túnel Inferior)"),
+            ("a_definir", "A definir"),
+        ],
+        ordem=1,
+        obrigatorio=1,
+    )
+    upsert_opcao_equipamento(
+        conn,
+        equipamento_id,
+        nome="Capacidade da Moega",
+        chave="capacidade_moega",
+        tipo="texto",
+        ordem=2,
+        obrigatorio=1,
+    )
+    upsert_opcao_equipamento(
+        conn,
+        equipamento_id,
+        nome="Prever tombador?",
+        chave="prever_tombador",
+        tipo="booleano",
+        ordem=3,
+        obrigatorio=1,
+    )
+
+
+def ensure_item2_fluxo(conn):
+    nome = "Item 2 - Fluxo"
     schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
     equipamento = conn.execute(
         "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
@@ -536,9 +646,9 @@ def ensure_item1_fluxo(conn):
         chave="tipo_fluxo",
         tipo="selecao",
         valores=[
-            ("fluxo_simples", "Fluxo Simples"),
+            ("fluxo_simples", "Fluxo Único"),
             ("fluxo_duplo", "Fluxo Duplo"),
-            ("fluxo_simples_previsao_duplo", "Fluxo Simples com previsão de duplo"),
+            ("fluxo_simples_previsao_duplo", "Fluxo Único com previsão de duplo"),
         ],
         ordem=1,
         obrigatorio=1,
@@ -553,37 +663,22 @@ def ensure_item1_fluxo(conn):
         ordem=2,
         obrigatorio=1,
     )
-    upsert_opcao_equipamento(
-        conn,
-        equipamento_id,
-        nome="Moega",
-        chave="moega",
-        tipo="selecao",
-        valores=[
-            ("simples", "Simples"),
-            ("dupla_poco_central", "Dupla (Poço Central)"),
-            ("paralela_tunel_inferior", "Paralela (Túnel Inferior)"),
-        ],
-        ordem=3,
-        obrigatorio=1,
-    )
     impurezas_id = upsert_opcao_equipamento(
         conn,
         equipamento_id,
         nome="Fluxo de Impurezas",
         chave="fluxo_impurezas_habilitado",
         tipo="booleano",
-        ordem=4,
+        ordem=3,
         obrigatorio=0,
     )
-    capacidade_impurezas_id = upsert_opcao_equipamento(
+    upsert_opcao_equipamento(
         conn,
         equipamento_id,
-        nome="Fluxo de Impurezas (Ton/h)",
+        nome="Detalhes do Fluxo de Impurezas",
         chave="fluxo_impurezas",
-        tipo="selecao",
-        valores=[("a_definir", "A definir"), *[(capacidade, f"{capacidade} Ton/h") for capacidade in capacidades]],
-        ordem=5,
+        tipo="texto",
+        ordem=4,
         obrigatorio=1,
     )
     upsert_opcao_equipamento(
@@ -592,21 +687,15 @@ def ensure_item1_fluxo(conn):
         nome="Canalização sugerida",
         chave="canalizacao_sugerida",
         tipo="texto",
-        ordem=6,
+        ordem=5,
         obrigatorio=0,
     )
-    conn.execute(
-        """
-        INSERT OR REPLACE INTO equipamentos_opcoes_dependencias
-        (opcao_id, depende_opcao_id, depende_valor)
-        VALUES (?, ?, ?)
-        """,
-        (capacidade_impurezas_id, impurezas_id, "sim"),
-    )
+    conn.execute("UPDATE equipamentos_opcoes SET ativo = 0 WHERE equipamento_id = ? AND chave = ?", (equipamento_id, "moega"))
+    conn.execute("DELETE FROM equipamentos_opcoes_dependencias WHERE depende_opcao_id = ?", (impurezas_id,))
 
 
-def ensure_item2_transportadores(conn):
-    nome = "Item 2 - Transportadores"
+def ensure_item3_transportadores(conn):
+    nome = "Item 3 - Transportadores"
     schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
     equipamento = conn.execute(
         "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
@@ -655,8 +744,8 @@ def ensure_item2_transportadores(conn):
     return cur.lastrowid
 
 
-def ensure_item3_maquina_limpeza(conn):
-    nome = "Item 3 - Máquina de Limpeza Grain Cleaner EC"
+def ensure_item4_maquina_limpeza(conn):
+    nome = "Item 4 - Máquina de Limpeza Grain Cleaner EC"
     schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
     equipamento = conn.execute(
         "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
@@ -705,8 +794,8 @@ def ensure_item3_maquina_limpeza(conn):
     return cur.lastrowid
 
 
-def ensure_item4_secadores(conn):
-    nome = "Item 4 - Secadores Process Dryer"
+def ensure_item5_secadores(conn):
+    nome = "Item 5 - Secadores Process Dryer"
     schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
     equipamento = conn.execute(
         "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
@@ -755,8 +844,8 @@ def ensure_item4_secadores(conn):
     return cur.lastrowid
 
 
-def ensure_item5_silo_pulmao(conn):
-    nome = "Item 5 - Silo Pulmão Elevado"
+def ensure_item6_silo_pulmao(conn):
+    nome = "Item 6 - Silo Pulmão Elevado"
     schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
     equipamento = conn.execute(
         "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
@@ -795,8 +884,8 @@ def ensure_item5_silo_pulmao(conn):
     return cur.lastrowid
 
 
-def ensure_item6_silo_fundo_plano(conn):
-    nome = "Item 6 - Silo Fundo Plano"
+def ensure_item7_silo_fundo_plano(conn):
+    nome = "Item 7 - Silo Fundo Plano"
     schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
     equipamento = conn.execute(
         "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",
@@ -835,8 +924,8 @@ def ensure_item6_silo_fundo_plano(conn):
     return cur.lastrowid
 
 
-def ensure_item7_expedicao(conn):
-    nome = "Item 7 - Expedição"
+def ensure_item8_expedicao(conn):
+    nome = "Item 8 - Expedição"
     schema_json = json.dumps({"nome": nome, "campos": []}, ensure_ascii=False)
     equipamento = conn.execute(
         "SELECT id FROM equipamentos_modelo WHERE parent_id IS NULL AND nome = ?",

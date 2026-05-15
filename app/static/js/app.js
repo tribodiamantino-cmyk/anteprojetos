@@ -441,35 +441,39 @@
     return option ? option.dataset.cadastroNome || option.textContent : "";
   }
 
+  function isMoegaSelected() {
+    return selectedCadastroNome() === "Item 1 - Moega" || selectedPath()[0] === "Moega";
+  }
+
   function isFluxoSelected() {
-    return selectedCadastroNome() === "Item 1 - Fluxo" || selectedPath()[0] === "Fluxo";
+    return ["Item 1 - Fluxo", "Item 2 - Fluxo"].includes(selectedCadastroNome()) || selectedPath()[0] === "Fluxo";
   }
 
   function isTransportadorSelected() {
-    return selectedCadastroNome() === "Item 2 - Transportadores" || selectedPath()[0] === "Transportadores";
+    return ["Item 2 - Transportadores", "Item 3 - Transportadores"].includes(selectedCadastroNome()) || selectedPath()[0] === "Transportadores";
   }
 
   function isMaquinaLimpezaSelected() {
     return (
-      selectedCadastroNome() === "Item 3 - Máquina de Limpeza Grain Cleaner EC" ||
+      ["Item 3 - Máquina de Limpeza Grain Cleaner EC", "Item 4 - Máquina de Limpeza Grain Cleaner EC"].includes(selectedCadastroNome()) ||
       selectedPath()[0] === "Máquina de Limpeza Grain Cleaner EC"
     );
   }
 
   function isSecadorSelected() {
-    return selectedCadastroNome() === "Item 4 - Secadores Process Dryer" || selectedPath()[0] === "Secadores Process Dryer";
+    return ["Item 4 - Secadores Process Dryer", "Item 5 - Secadores Process Dryer"].includes(selectedCadastroNome()) || selectedPath()[0] === "Secadores Process Dryer";
   }
 
   function isSiloPulmaoSelected() {
-    return selectedCadastroNome() === "Item 5 - Silo Pulmão Elevado" || selectedPath()[0] === "Silo Pulmão Elevado";
+    return ["Item 5 - Silo Pulmão Elevado", "Item 6 - Silo Pulmão Elevado"].includes(selectedCadastroNome()) || selectedPath()[0] === "Silo Pulmão Elevado";
   }
 
   function isSiloFundoPlanoSelected() {
-    return selectedCadastroNome() === "Item 6 - Silo Fundo Plano" || selectedPath()[0] === "Silo Fundo Plano";
+    return ["Item 6 - Silo Fundo Plano", "Item 7 - Silo Fundo Plano"].includes(selectedCadastroNome()) || selectedPath()[0] === "Silo Fundo Plano";
   }
 
   function isExpedicaoSelected() {
-    return selectedCadastroNome() === "Item 7 - Expedição" || selectedPath()[0] === "Expedição";
+    return ["Item 7 - Expedição", "Item 8 - Expedição"].includes(selectedCadastroNome()) || selectedPath()[0] === "Expedição";
   }
 
   function setVariationFieldsVisible(visible) {
@@ -668,6 +672,28 @@
       );
     });
     step.appendChild(grid);
+    return step;
+  }
+
+  function makeFluxoTextStep(titleText, option, currentValue, placeholder, onInput) {
+    const step = document.createElement("section");
+    step.className = "fluxo-step";
+    const title = document.createElement("h4");
+    title.textContent = titleText;
+    step.appendChild(title);
+
+    const present = document.createElement("input");
+    present.type = "hidden";
+    present.name = `opcao_presente__${option.id}`;
+    present.value = "1";
+    step.appendChild(present);
+
+    const input = document.createElement("input");
+    input.name = `opcao__${option.id}`;
+    input.value = currentValue || "";
+    input.placeholder = placeholder || "";
+    input.addEventListener("input", () => onInput(input.value));
+    step.appendChild(input);
     return step;
   }
 
@@ -883,9 +909,8 @@
     const graos = optionMap.fluxo_graos;
     const impurezasToggle = optionMap.fluxo_impurezas_habilitado;
     const impurezas = optionMap.fluxo_impurezas;
-    const moega = optionMap.moega;
     const canalizacao = optionMap.canalizacao_sugerida;
-    const requiredOptions = [tipo, graos, impurezasToggle, impurezas, moega];
+    const requiredOptions = [tipo, graos, impurezasToggle, impurezas, canalizacao];
     if (requiredOptions.some((option) => !option)) {
       optionsBox.innerHTML = '<p class="muted">Configuracao do Fluxo incompleta.</p>';
       setFinalFieldsVisible(false);
@@ -897,7 +922,6 @@
       graos: savedOptionValue(graos),
       impurezasToggle: savedOptionValue(impurezasToggle) || "",
       impurezas: savedOptionValue(impurezas),
-      moega: savedOptionValue(moega),
     };
 
     function isComplete() {
@@ -905,8 +929,7 @@
         state.tipo &&
           state.graos &&
           state.impurezasToggle &&
-          (state.impurezasToggle === "nao" || state.impurezas) &&
-          state.moega
+          (state.impurezasToggle === "nao" || state.impurezas)
       );
     }
 
@@ -929,7 +952,6 @@
           state.graos = "";
           state.impurezasToggle = "";
           state.impurezas = "";
-          state.moega = "";
           rerender();
         })
       );
@@ -943,7 +965,6 @@
             state.graos = value;
             state.impurezasToggle = "";
             state.impurezas = "";
-            state.moega = "";
             rerender();
           })
         );
@@ -958,7 +979,6 @@
           ], state.impurezasToggle, (value) => {
             state.impurezasToggle = value;
             state.impurezas = "";
-            state.moega = "";
             rerender();
           })
         );
@@ -966,30 +986,14 @@
 
       if (state.impurezasToggle === "sim") {
         wrap.appendChild(
-          makeFluxoStep("Etapa 3.1 - Capacidade do Fluxo de Impurezas", impurezas, impurezas.valores.map((value) => ({
-            label: value.rotulo,
-            value: value.valor,
-          })), state.impurezas, (value) => {
+          makeFluxoTextStep("Etapa 3.1 - Detalhes do Fluxo de Impurezas", impurezas, state.impurezas, "Descreva o conceito do fluxo de impurezas", (value) => {
             state.impurezas = value;
-            state.moega = "";
-            rerender();
+            setFinalFieldsVisible(isComplete());
           })
         );
       } else {
         const hidden = fluxoHidden(impurezas, "", true);
         wrap.appendChild(hidden.fragment);
-      }
-
-      if (state.impurezasToggle === "nao" || state.impurezas) {
-        wrap.appendChild(
-          makeFluxoStep("Etapa 4 - Moega", moega, moega.valores.map((value) => ({
-            label: value.rotulo,
-            value: value.valor,
-          })), state.moega, (value) => {
-            state.moega = value;
-            rerender();
-          })
-        );
       }
 
       optionsBox.appendChild(wrap);
@@ -2042,6 +2046,25 @@
         yes.value = "sim";
         yes.textContent = "Sim";
         yes.selected = saved.valor === "sim";
+        select.appendChild(no);
+        select.appendChild(yes);
+        label.appendChild(select);
+      } else if (option.tipo === "booleano" && option.obrigatorio) {
+        const select = document.createElement("select");
+        select.name = `opcao__${option.id}`;
+        select.required = true;
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "Selecione";
+        const no = document.createElement("option");
+        no.value = "nao";
+        no.textContent = "Não";
+        no.selected = saved.valor === "nao";
+        const yes = document.createElement("option");
+        yes.value = "sim";
+        yes.textContent = "Sim";
+        yes.selected = saved.valor === "sim";
+        select.appendChild(empty);
         select.appendChild(no);
         select.appendChild(yes);
         label.appendChild(select);
